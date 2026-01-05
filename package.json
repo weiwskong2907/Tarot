@@ -1,0 +1,17 @@
+{
+  "name": "tarot-platform",
+  "version": "1.0.0",
+  "description": "Tarot Booking and Consultation Platform",
+  "scripts": {
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

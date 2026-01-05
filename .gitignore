@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.pdb
+*.lock.json
+project.lock.json
+.DS_Store
+node_modules/
+dist/
+coverage/
+.env
+appsettings.Development.json
+TestResults/

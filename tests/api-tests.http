@@ -1,0 +1,40 @@
+@host = http://localhost:5000
+
+### 1. Register User
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "Password123!",
+  "fullName": "Test User"
+}
+
+### 2. Login
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "Password123!"
+}
+
+### 3. Get Appointments (Requires Auth)
+GET {{host}}/api/appointments
+Authorization: Bearer {{login.response.body.token}}
+# Note: Since we are using Cookie Identity by default in .NET Identity, this might return 401 if we don't handle cookies.
+# However, for API we usually want JWT. The current setup uses default Identity cookies. 
+# We'll need to check if we enabled JWT or if we rely on cookies.
+# Assuming Cookies for now, standard .NET Identity behavior.
+# In VS Code REST Client, cookies are usually handled automatically if configured, but let's see.
+
+### 4. Create Appointment
+POST {{host}}/api/appointments
+Content-Type: application/json
+# Cookie auth would be needed here
+
+{
+  "serviceId": "replace_with_valid_guid_from_db", 
+  "startTime": "2026-06-10T10:00:00Z"
+}

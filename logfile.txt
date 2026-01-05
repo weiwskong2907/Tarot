@@ -1,0 +1,2 @@
+2026-06-01T10:30:00Z | User <user@example.com> | Phase 2 Core Impl | Added Enums, Entities (AppUser, Service, Appointment...), and AppDbContext with SoftDelete filters. Fixed NuGet versions to 9.0.0. | Tests: Pending
+2026-06-01T11:00:00Z | User <user@example.com> | Phase 2 API & Infrastructure | Configured Docker for PostgreSQL/Redis. Applied Initial EF Migration. Implemented AuthController and AppointmentController with Service layer. | Tests: Manual Verification
