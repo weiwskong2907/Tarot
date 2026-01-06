@@ -17,6 +17,21 @@ public class EfRepository<T>(AppDbContext dbContext) : IRepository<T> where T : 
         return await _dbContext.Set<T>().ToListAsync();
     }
 
+    public async Task<IReadOnlyList<T>> ListAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate)
+    {
+        return await _dbContext.Set<T>().Where(predicate).ToListAsync();
+    }
+
+    public async Task<T?> FirstOrDefaultAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate)
+    {
+        return await _dbContext.Set<T>().FirstOrDefaultAsync(predicate);
+    }
+
+    public async Task<int> CountAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate)
+    {
+        return await _dbContext.Set<T>().CountAsync(predicate);
+    }
+
     public async Task<T> AddAsync(T entity)
     {
         await _dbContext.Set<T>().AddAsync(entity);

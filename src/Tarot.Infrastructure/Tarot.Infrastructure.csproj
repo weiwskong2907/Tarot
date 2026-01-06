@@ -5,8 +5,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Ical.Net" Version="5.2.0" />
+    <PackageReference Include="MailKit" Version="4.14.1" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
+    <PackageReference Include="RazorLight" Version="2.3.1" />
+    <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
   </ItemGroup>
 
   <PropertyGroup>

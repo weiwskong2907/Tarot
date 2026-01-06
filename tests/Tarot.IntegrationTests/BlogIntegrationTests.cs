@@ -16,7 +16,7 @@ public class BlogIntegrationTests : IClassFixture<CustomWebApplicationFactory<Pr
     public async Task GetAllPosts_ShouldReturnOk()
     {
         // Act
-        var response = await _client.GetAsync("/api/blogposts");
+        var response = await _client.GetAsync("/api/v1/blogposts");
 
         // Assert
         response.EnsureSuccessStatusCode();
@@ -40,7 +40,7 @@ public class BlogIntegrationTests : IClassFixture<CustomWebApplicationFactory<Pr
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/blogposts", dto);
+        var response = await _client.PostAsJsonAsync("/api/v1/blogposts", dto);
 
         // Assert
         Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);

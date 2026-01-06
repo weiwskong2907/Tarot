@@ -7,30 +7,21 @@ using Tarot.Core.Interfaces;
 namespace Tarot.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class BlogPostsController : ControllerBase
+[Route("api/v1/[controller]")]
+public class BlogPostsController(IBlogService blogService) : ControllerBase
 {
-    private readonly IBlogService _blogService;
-
-    public BlogPostsController(IBlogService blogService)
-    {
-        _blogService = blogService;
-    }
+    private readonly IBlogService _blogService = blogService;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
-    {
-        var posts = await _blogService.GetAllPostsAsync();
-        var dtos = posts.Select(p => new BlogPostDto
+    public async Task<IActionResult> GetAll() =>
+        Ok((await _blogService.GetAllPostsAsync()).Select(p => new BlogPostDto
         {
             Id = p.Id,
             Title = p.Title,
             Slug = p.Slug,
             Content = p.Content,
             CreatedAt = p.CreatedAt
-        });
-        return Ok(dtos);
-    }
+        }));
 
     [HttpGet("{slug}")]
     public async Task<IActionResult> GetBySlug(string slug)
@@ -48,7 +39,7 @@ public class BlogPostsController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "Admin,SuperAdmin")] // Only admins can create
+    [Authorize(Policy = "BLOG_MANAGE")]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateBlogPostDto dto)
     {
@@ -68,5 +59,29 @@ public class BlogPostsController : ControllerBase
         {
             return BadRequest(ex.Message);
         }
+    }
+
+    [Authorize(Policy = "BLOG_MANAGE")]
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreateBlogPostDto dto)
+    {
+        var existing = await _blogService.GetPostBySlugAsync(dto.Slug);
+        if (existing == null || existing.Id != id)
+        {
+            return NotFound();
+        }
+        existing.Title = dto.Title;
+        existing.Content = dto.Content;
+        existing.SeoMeta = dto.SeoMeta;
+        await _blogService.UpdatePostAsync(existing);
+        return Ok(existing);
+    }
+
+    [Authorize(Policy = "BLOG_MANAGE")]
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _blogService.DeletePostAsync(id);
+        return NoContent();
     }
 }

@@ -3,21 +3,32 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Tarot.Api.Dtos;
 using Tarot.Core.Interfaces;
+using Tarot.Core.Entities;
+using System.Text.Json;
+using Ical.Net;
+using Ical.Net.CalendarComponents;
+using Ical.Net.DataTypes;
 
 namespace Tarot.Api.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 public class AppointmentsController : ControllerBase
 {
     private readonly IAppointmentService _appointmentService;
     private readonly IPaymentService _paymentService;
+    private readonly IRepository<Appointment> _appointmentRepo;
+    private readonly IRepository<Service> _serviceRepo;
+    private readonly IRepository<Consultation> _consultationRepo;
 
-    public AppointmentsController(IAppointmentService appointmentService, IPaymentService paymentService)
+    public AppointmentsController(IAppointmentService appointmentService, IPaymentService paymentService, IRepository<Appointment> appointmentRepo, IRepository<Service> serviceRepo, IRepository<Consultation> consultationRepo)
     {
         _appointmentService = appointmentService;
         _paymentService = paymentService;
+        _appointmentRepo = appointmentRepo;
+        _serviceRepo = serviceRepo;
+        _consultationRepo = consultationRepo;
     }
 
     [HttpPost]
@@ -28,14 +39,27 @@ public class AppointmentsController : ControllerBase
         {
             var appointment = await _appointmentService.CreateAppointmentAsync(userId, dto.ServiceId, dto.StartTime);
             
-            // Process Payment (Mock)
-            if (appointment.Price > 0)
+            var enablePaymentEnv = Environment.GetEnvironmentVariable("ENABLE_PAYMENT");
+            var enablePayment = string.IsNullOrEmpty(enablePaymentEnv) ? true : enablePaymentEnv.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+            if (!enablePayment)
             {
-                var paid = await _paymentService.ProcessPaymentAsync(userId, appointment.Price);
-                if (!paid)
+                appointment.Status = Core.Enums.AppointmentStatus.Confirmed;
+                appointment.PaymentStatus = Core.Enums.PaymentStatus.Skipped;
+                await _appointmentRepo.UpdateAsync(appointment);
+            }
+            else
+            {
+                if (appointment.Price > 0)
                 {
-                    // In real scenario, we might cancel the appointment or mark as unpaid
-                    return BadRequest("Payment failed");
+                    var paid = await _paymentService.ProcessPaymentAsync(userId, appointment.Price);
+                    if (!paid)
+                    {
+                        return BadRequest("Payment failed");
+                    }
+                    appointment.Status = Core.Enums.AppointmentStatus.Confirmed;
+                    appointment.PaymentStatus = Core.Enums.PaymentStatus.Paid;
+                    await _appointmentRepo.UpdateAsync(appointment);
                 }
             }
             
@@ -74,6 +98,25 @@ public class AppointmentsController : ControllerBase
         return Ok(dtos);
     }
 
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+        var appointment = await _appointmentService.GetAppointmentByIdAsync(id);
+        if (appointment == null || appointment.UserId != userId)
+            return NotFound();
+
+        return Ok(new AppointmentDto
+        {
+            Id = appointment.Id,
+            ServiceId = appointment.ServiceId,
+            StartTime = appointment.StartTime,
+            EndTime = appointment.EndTime,
+            Status = appointment.Status.ToString(),
+            Price = appointment.Price
+        });
+    }
+
     [HttpPost("{id}/cancel")]
     public async Task<IActionResult> Cancel(Guid id)
     {
@@ -84,5 +127,80 @@ public class AppointmentsController : ControllerBase
             return BadRequest("Cannot cancel appointment");
 
         return Ok(new { Message = "Appointment cancelled" });
+    }
+
+    [HttpPost("{id}/reschedule")]
+    public async Task<IActionResult> Reschedule(Guid id, [FromBody] RescheduleAppointmentDto dto)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+        try
+        {
+            var appt = await _appointmentService.RescheduleAppointmentAsync(id, userId, dto.NewStartTime);
+            return Ok(new { Message = "Rescheduled successfully", NewTime = appt.StartTime });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("{id}/consultation")]
+    public async Task<IActionResult> SubmitConsultation(Guid id, [FromBody] ConsultationMessageDto dto)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+        var appt = await _appointmentRepo.GetByIdAsync(id);
+        if (appt == null || appt.UserId != userId) return NotFound();
+
+        var consultation = (await _consultationRepo.ListAsync(c => c.AppointmentId == id)).FirstOrDefault();
+        if (consultation == null)
+        {
+            consultation = new Consultation { AppointmentId = id, CreatedAt = DateTimeOffset.UtcNow };
+            if (dto.ImageUrls != null && dto.ImageUrls.Any())
+            {
+                consultation.UserImages = JsonSerializer.Serialize(dto.ImageUrls);
+            }
+            consultation.Question = dto.Message;
+            await _consultationRepo.AddAsync(consultation);
+        }
+        else
+        {
+            consultation.Question = dto.Message;
+            if (dto.ImageUrls != null && dto.ImageUrls.Any())
+            {
+                consultation.UserImages = JsonSerializer.Serialize(dto.ImageUrls);
+            }
+            consultation.UpdatedAt = DateTimeOffset.UtcNow;
+            await _consultationRepo.UpdateAsync(consultation);
+        }
+
+        // Update status to InProgress if Confirmed
+        if (appt.Status == Core.Enums.AppointmentStatus.Confirmed)
+        {
+            appt.Status = Core.Enums.AppointmentStatus.InProgress;
+            await _appointmentRepo.UpdateAsync(appt);
+        }
+
+        return Ok(new { Message = "Consultation submitted" });
+    }
+
+    [HttpGet("{id}/calendar")]
+    public async Task<IActionResult> GetCalendar(Guid id)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+        var appt = await _appointmentRepo.GetByIdAsync(id);
+        if (appt == null || appt.UserId != userId) return NotFound();
+
+        var cal = new Calendar();
+        var evt = new CalendarEvent
+        {
+            Summary = "Tarot Appointment",
+            DtStart = new CalDateTime(appt.StartTime.UtcDateTime),
+            DtEnd = new CalDateTime(appt.EndTime.UtcDateTime),
+            Description = $"Service {appt.ServiceId} | Price {appt.Price}",
+        };
+        cal.Events.Add(evt);
+        var serializer = new Ical.Net.Serialization.CalendarSerializer();
+        var ics = serializer.SerializeToString(cal) ?? string.Empty;
+        return File(System.Text.Encoding.UTF8.GetBytes(ics), "text/calendar", "appointment.ics");
     }
 }

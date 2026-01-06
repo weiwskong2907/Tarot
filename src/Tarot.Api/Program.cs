@@ -7,6 +7,11 @@ using Tarot.Infrastructure.Data;
 using Tarot.Infrastructure.Services;
 
 using Tarot.Infrastructure.Plugins;
+using StackExchange.Redis;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +19,32 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+
+// Health Checks
+var healthChecks = builder.Services.AddHealthChecks();
+if (!builder.Configuration.GetValue<bool>("UseInMemoryDatabase"))
+{
+    var dbConn = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrEmpty(dbConn))
+    {
+        healthChecks.AddNpgSql(dbConn, name: "Database");
+    }
+}
+
+// Redis Configuration
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost";
+try
+{
+    var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
+    builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+    builder.Services.AddScoped<IRedisService, RedisService>();
+}
+catch
+{
+    // Fallback to In-Memory if Redis is not available (for dev/testing)
+    Console.WriteLine("Redis not available, using In-Memory fallback.");
+    builder.Services.AddSingleton<IRedisService, InMemoryRedisService>();
+}
 
 // Configure Database
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -41,10 +72,43 @@ builder.Services.AddIdentity<AppUser, IdentityRole<Guid>>(options =>
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
 
+var authBuilder = builder.Services.AddAuthorizationBuilder();
+authBuilder.AddPolicy("SCHEDULE_MANAGE", policy => policy.RequireClaim("permission", "SCHEDULE_MANAGE"));
+authBuilder.AddPolicy("CONSULTATION_REPLY", policy => policy.RequireClaim("permission", "CONSULTATION_REPLY"));
+authBuilder.AddPolicy("FINANCE_VIEW", policy => policy.RequireClaim("permission", "FINANCE_VIEW"));
+authBuilder.AddPolicy("BLOG_MANAGE", policy => policy.RequireClaim("permission", "BLOG_MANAGE"));
+authBuilder.AddPolicy("KNOWLEDGE_EDIT", policy => policy.RequireClaim("permission", "KNOWLEDGE_EDIT"));
+authBuilder.AddPolicy("DESIGN_EDIT", policy => policy.RequireClaim("permission", "DESIGN_EDIT"));
+
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "dev-secret-key-change-me";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "TarotIssuer";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "TarotAudience";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+    };
+});
+
 // Register Services
 builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IBlogService, BlogService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+// Mock Payment Service (as requested by user in previous turn)
 builder.Services.AddScoped<IPaymentService, MockPaymentService>();
 
 // Register Plugin Manager
@@ -74,6 +138,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/api/v1/health");
 
 // Seed Data
 using (var scope = app.Services.CreateScope())

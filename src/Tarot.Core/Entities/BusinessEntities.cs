@@ -60,11 +60,14 @@ public class Consultation : BaseEntity
 public class Card : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
+    public string? NameCn { get; set; } // Chinese Name
     public string? ImageUrl { get; set; }
     public Suit Suit { get; set; }
     public ArcanaType ArcanaType { get; set; }
     public string? MeaningUpright { get; set; }
+    public string? MeaningUprightCn { get; set; } // Chinese Meaning Upright
     public string? MeaningReversed { get; set; }
+    public string? MeaningReversedCn { get; set; } // Chinese Meaning Reversed
     public string? Keywords { get; set; } // JSONB
     public string? AdminNotes { get; set; }
 }

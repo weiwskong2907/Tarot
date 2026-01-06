@@ -4,25 +4,17 @@ using Tarot.Core.Interfaces;
 namespace Tarot.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class PluginsController : ControllerBase
+[Route("api/v1/[controller]")]
+public class PluginsController(IPluginManager pluginManager) : ControllerBase
 {
-    private readonly IPluginManager _pluginManager;
-
-    public PluginsController(IPluginManager pluginManager)
-    {
-        _pluginManager = pluginManager;
-    }
+    private readonly IPluginManager _pluginManager = pluginManager;
 
     [HttpGet]
-    public IActionResult GetPlugins()
-    {
-        var plugins = _pluginManager.GetPlugins().Select(p => new
+    public IActionResult GetPlugins() =>
+        Ok(_pluginManager.GetPlugins().Select(p => new
         {
             p.Name,
             p.Version,
             p.Description
-        });
-        return Ok(plugins);
-    }
+        }));
 }

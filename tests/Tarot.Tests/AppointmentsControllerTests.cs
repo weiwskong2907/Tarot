@@ -14,6 +14,9 @@ public class AppointmentsControllerTests
 {
     private readonly Mock<IAppointmentService> _mockAppointmentService;
     private readonly Mock<IPaymentService> _mockPaymentService;
+    private readonly Mock<IRepository<Appointment>> _mockAppointmentRepo;
+    private readonly Mock<IRepository<Service>> _mockServiceRepo;
+    private readonly Mock<IRepository<Consultation>> _mockConsultationRepo;
     private readonly AppointmentsController _controller;
     private readonly Guid _userId;
 
@@ -21,7 +24,10 @@ public class AppointmentsControllerTests
     {
         _mockAppointmentService = new Mock<IAppointmentService>();
         _mockPaymentService = new Mock<IPaymentService>();
-        _controller = new AppointmentsController(_mockAppointmentService.Object, _mockPaymentService.Object);
+        _mockAppointmentRepo = new Mock<IRepository<Appointment>>();
+        _mockServiceRepo = new Mock<IRepository<Service>>();
+        _mockConsultationRepo = new Mock<IRepository<Consultation>>();
+        _controller = new AppointmentsController(_mockAppointmentService.Object, _mockPaymentService.Object, _mockAppointmentRepo.Object, _mockServiceRepo.Object, _mockConsultationRepo.Object);
         
         _userId = Guid.NewGuid();
         

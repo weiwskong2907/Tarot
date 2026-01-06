@@ -20,3 +20,16 @@ public class AppointmentDto
     public string Status { get; set; } = string.Empty;
     public decimal Price { get; set; }
 }
+
+public class RescheduleAppointmentDto
+{
+    [Required]
+    public DateTime NewStartTime { get; set; }
+}
+
+public class ConsultationMessageDto
+{
+    [Required]
+    public string Message { get; set; } = string.Empty;
+    public List<string>? ImageUrls { get; set; }
+}

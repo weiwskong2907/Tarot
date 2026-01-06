@@ -47,7 +47,7 @@ public class AppointmentsIntegrationTests : IClassFixture<CustomWebApplicationFa
         };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/appointments", dto);
+        var response = await _client.PostAsJsonAsync("/api/v1/appointments", dto);
 
         // Assert
         response.EnsureSuccessStatusCode(); // Status Code 200-299
@@ -61,7 +61,7 @@ public class AppointmentsIntegrationTests : IClassFixture<CustomWebApplicationFa
     public async Task GetMyAppointments_ShouldReturnList()
     {
         // Act
-        var response = await _client.GetAsync("/api/appointments");
+        var response = await _client.GetAsync("/api/v1/appointments");
 
         // Assert
         response.EnsureSuccessStatusCode();

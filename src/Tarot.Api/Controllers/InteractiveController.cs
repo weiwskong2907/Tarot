@@ -1,0 +1,112 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using Tarot.Core.Entities;
+using Tarot.Core.Interfaces;
+using System.Text.Json;
+
+namespace Tarot.Api.Controllers;
+
+[Authorize]
+[ApiController]
+[Route("api/v1")]
+public class InteractiveController : ControllerBase
+{
+    private readonly IRepository<DailyDrawRecord> _dailyRepo;
+    private readonly IRepository<Card> _cardRepo;
+
+    public InteractiveController(IRepository<DailyDrawRecord> dailyRepo, IRepository<Card> cardRepo)
+    {
+        _dailyRepo = dailyRepo;
+        _cardRepo = cardRepo;
+    }
+
+    [HttpPost("daily-draw")]
+    public async Task<IActionResult> DailyDraw()
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+
+        // Check if already drawn today
+        var existingCount = await _dailyRepo.CountAsync(d => d.UserId == userId && d.DrawDate >= today && d.DrawDate < tomorrow);
+
+        if (existingCount > 0)
+        {
+            return BadRequest("You have already drawn a card today.");
+        }
+
+        // Fetch cards and randomly select one
+        var cards = await _cardRepo.ListAllAsync();
+        if (cards.Count == 0)
+        {
+            return BadRequest("No cards available in the deck.");
+        }
+        var selected = cards[Random.Shared.Next(cards.Count)];
+        
+        var record = new DailyDrawRecord
+        {
+            UserId = userId,
+            CardId = selected.Id,
+            DrawDate = DateTime.UtcNow,
+            Notes = "Daily Draw"
+        };
+
+        await _dailyRepo.AddAsync(record);
+
+        return Ok(new 
+        { 
+            Message = "Card drawn", 
+            CardId = selected.Id,
+            Card = new { selected.Name, selected.NameCn, selected.Suit, selected.ArcanaType, selected.ImageUrl, selected.MeaningUpright, selected.MeaningUprightCn, selected.MeaningReversed, selected.MeaningReversedCn }
+        });
+    }
+
+    [HttpPost("self-reading")]
+    public async Task<IActionResult> SelfReading()
+    {
+        var cards = await _cardRepo.ListAllAsync();
+        if (cards.Count < 3)
+        {
+            return BadRequest("Not enough cards available for self-reading.");
+        }
+
+        // Pick 3 distinct cards
+        var indices = new HashSet<int>();
+        while (indices.Count < 3)
+        {
+            indices.Add(Random.Shared.Next(cards.Count));
+        }
+
+        var selectedCards = indices.Select(i => cards[i]).ToList();
+        var positions = new[] { "Past", "Present", "Future" };
+        var spread = new List<object>();
+
+        for (int i = 0; i < 3; i++)
+        {
+            var card = selectedCards[i];
+            // Randomly determine orientation (50% chance)
+            bool isUpright = Random.Shared.Next(2) == 0;
+
+            spread.Add(new 
+            {
+                Position = positions[i],
+                IsUpright = isUpright,
+                Card = new 
+                { 
+                    card.Id, 
+                    card.Name, 
+                    card.Suit, 
+                    card.ArcanaType, 
+                    card.ImageUrl, 
+                    // Return both meanings but highlight the relevant one
+                    card.MeaningUpright, 
+                    card.MeaningReversed,
+                    CurrentMeaning = isUpright ? card.MeaningUpright : card.MeaningReversed
+                }
+            });
+        }
+
+        return Ok(new { Message = "Past, Present, Future Reading", Spread = spread });
+    }
+}

@@ -4,62 +4,134 @@ using Tarot.Core.Interfaces;
 
 namespace Tarot.Core.Services;
 
-public class AppointmentService : IAppointmentService
+public class AppointmentService(
+    IRepository<Appointment> appointmentRepo, 
+    IRepository<Service> serviceRepo,
+    IRepository<AppUser> userRepo,
+    IRedisService redisService,
+    IEmailService emailService) : IAppointmentService
 {
-    private readonly IRepository<Appointment> _appointmentRepo;
-    private readonly IRepository<Service> _serviceRepo;
-
-    public AppointmentService(IRepository<Appointment> appointmentRepo, IRepository<Service> serviceRepo)
-    {
-        _appointmentRepo = appointmentRepo;
-        _serviceRepo = serviceRepo;
-    }
+    private readonly IRepository<Appointment> _appointmentRepo = appointmentRepo;
+    private readonly IRepository<Service> _serviceRepo = serviceRepo;
+    private readonly IRepository<AppUser> _userRepo = userRepo;
+    private readonly IRedisService _redisService = redisService;
+    private readonly IEmailService _emailService = emailService;
 
     public async Task<Appointment> CreateAppointmentAsync(Guid userId, Guid serviceId, DateTime scheduledTime)
     {
-        var service = await _serviceRepo.GetByIdAsync(serviceId);
-        if (service == null)
-            throw new Exception("Service not found");
+        var service = await _serviceRepo.GetByIdAsync(serviceId) ?? throw new Exception("Service not found");
 
-        var startTime = new DateTimeOffset(scheduledTime, TimeSpan.Zero); // Assuming UTC
-        var appointment = new Appointment
+        var startTime = new DateTimeOffset(scheduledTime, TimeSpan.Zero);
+        var endTime = startTime.AddMinutes(service.DurationMin);
+
+        // 1. Redis Distributed Lock to prevent double booking
+        var lockKey = $"lock:appointment:{scheduledTime:yyyyMMddHHmm}";
+        var acquired = await _redisService.AcquireLockAsync(lockKey, TimeSpan.FromSeconds(10));
+        if (!acquired)
         {
-            UserId = userId,
-            ServiceId = serviceId,
-            StartTime = startTime,
-            EndTime = startTime.AddMinutes(service.DurationMin),
-            Status = AppointmentStatus.Pending,
-            Price = service.Price,
-            CreatedAt = DateTime.UtcNow
-        };
+            throw new Exception("System busy, please try again.");
+        }
 
-        await _appointmentRepo.AddAsync(appointment);
-        return appointment;
+        try
+        {
+            // 2. Check DB availability
+            // Ensure no overlap: (Start < NewEnd) and (End > NewStart)
+            var existingCount = await _appointmentRepo.CountAsync(a => a.Status != AppointmentStatus.Cancelled && 
+                      a.StartTime < endTime && 
+                      a.EndTime > startTime);
+
+            if (existingCount > 0)
+            {
+                throw new Exception("Time slot is not available.");
+            }
+
+            // 3. Create Appointment
+            var appointment = new Appointment
+            {
+                UserId = userId,
+                ServiceId = serviceId,
+                StartTime = startTime,
+                EndTime = endTime,
+                Status = AppointmentStatus.Pending,
+                Price = service.Price,
+                CreatedAt = DateTime.UtcNow,
+                PaymentStatus = PaymentStatus.Unpaid
+            };
+
+            await _appointmentRepo.AddAsync(appointment);
+
+            // 4. Send Notification (Async fire and forget or queued)
+            // In a real app, this should probably be a background job
+            // await _emailService.SendTemplateEmailAsync(userEmail, "appointment-created", appointment);
+
+            return appointment;
+        }
+        finally
+        {
+            await _redisService.ReleaseLockAsync(lockKey);
+        }
     }
 
-    public async Task<IEnumerable<Appointment>> GetUserAppointmentsAsync(Guid userId)
-    {
-        // simplistic implementation, ideally would use a Specification pattern or custom query
-        var all = await _appointmentRepo.ListAllAsync();
-        return all.Where(a => a.UserId == userId);
-    }
+    public Task<IReadOnlyList<Appointment>> GetUserAppointmentsAsync(Guid userId) =>
+        _appointmentRepo.ListAsync(a => a.UserId == userId);
 
-    public async Task<Appointment?> GetAppointmentByIdAsync(Guid id)
-    {
-        return await _appointmentRepo.GetByIdAsync(id);
-    }
+    public Task<Appointment?> GetAppointmentByIdAsync(Guid id) =>
+        _appointmentRepo.GetByIdAsync(id);
 
     public async Task<bool> CancelAppointmentAsync(Guid id, Guid userId)
     {
         var appointment = await _appointmentRepo.GetByIdAsync(id);
-        if (appointment == null || appointment.UserId != userId)
+        if (appointment is null || appointment.UserId != userId)
             return false;
 
-        if (appointment.Status == AppointmentStatus.Completed)
+        if (appointment.Status is AppointmentStatus.Completed)
             return false;
 
         appointment.Status = AppointmentStatus.Cancelled;
         await _appointmentRepo.UpdateAsync(appointment);
+        
+        // Return inventory/lock if necessary (implicit by Status change)
+        
         return true;
+    }
+
+    public async Task<Appointment> RescheduleAppointmentAsync(Guid id, Guid userId, DateTime newTime)
+    {
+        var appt = await _appointmentRepo.GetByIdAsync(id) ?? throw new Exception("Appointment not found");
+        if (appt.UserId != userId) throw new Exception("Unauthorized");
+        
+        if (appt.Status == AppointmentStatus.Completed || appt.Status == AppointmentStatus.Cancelled)
+            throw new Exception("Cannot reschedule completed or cancelled appointment");
+
+        var service = await _serviceRepo.GetByIdAsync(appt.ServiceId) ?? throw new Exception("Service data corrupt");
+
+        var startTime = new DateTimeOffset(newTime, TimeSpan.Zero);
+        var endTime = startTime.AddMinutes(service.DurationMin);
+
+        // Lock
+        var lockKey = $"lock:appointment:{newTime:yyyyMMddHHmm}";
+        var acquired = await _redisService.AcquireLockAsync(lockKey, TimeSpan.FromSeconds(10));
+        if (!acquired) throw new Exception("System busy, please try again.");
+
+        try
+        {
+            // Check Availability (exclude self)
+            var count = await _appointmentRepo.CountAsync(a => a.Id != id && 
+                a.Status != AppointmentStatus.Cancelled &&
+                a.StartTime < endTime && a.EndTime > startTime);
+
+            if (count > 0) throw new Exception("Time slot is not available.");
+
+            appt.StartTime = startTime;
+            appt.EndTime = endTime;
+            appt.RescheduleCount++;
+            await _appointmentRepo.UpdateAsync(appt);
+            
+            return appt;
+        }
+        finally
+        {
+            await _redisService.ReleaseLockAsync(lockKey);
+        }
     }
 }

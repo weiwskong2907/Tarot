@@ -13,6 +13,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<Card> Cards { get; set; } = null!;
     public DbSet<DailyDrawRecord> DailyDrawRecords { get; set; } = null!;
     public DbSet<BlogPost> BlogPosts { get; set; } = null!;
+    public DbSet<SiteSetting> SiteSettings { get; set; } = null!;
+    public DbSet<EmailTemplate> EmailTemplates { get; set; } = null!;
+    public DbSet<ContactMessage> ContactMessages { get; set; } = null!;
+    public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+    public DbSet<BlockedSlot> BlockedSlots { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -25,6 +30,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         builder.Entity<Card>().HasQueryFilter(e => e.DeletedAt == null);
         builder.Entity<DailyDrawRecord>().HasQueryFilter(e => e.DeletedAt == null);
         builder.Entity<BlogPost>().HasQueryFilter(e => e.DeletedAt == null);
+        builder.Entity<SiteSetting>().HasQueryFilter(e => e.DeletedAt == null);
+        builder.Entity<EmailTemplate>().HasQueryFilter(e => e.DeletedAt == null);
+        builder.Entity<ContactMessage>().HasQueryFilter(e => e.DeletedAt == null);
+        builder.Entity<AuditLog>().HasQueryFilter(e => e.DeletedAt == null);
 
         // Configure JSONB columns (PostgreSQL specific)
         // Note: In EF Core 8/9, we can map JSON columns directly or use HasColumnType("jsonb")
@@ -51,6 +60,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         {
             b.Property(p => p.SeoMeta).HasColumnType("jsonb");
             b.HasIndex(p => p.Slug).IsUnique();
+        });
+
+        builder.Entity<SiteSetting>(b =>
+        {
+            b.Property(s => s.Value).HasColumnType("jsonb");
+        });
+
+        builder.Entity<EmailTemplate>(b =>
+        {
+            b.HasIndex(e => e.Slug).IsUnique();
         });
 
         // Relationships
