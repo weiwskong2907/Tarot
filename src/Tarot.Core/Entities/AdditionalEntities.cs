@@ -44,3 +44,13 @@ public class AuditLog : BaseEntity
     public string? Details { get; set; }
     public string? IpAddress { get; set; }
 }
+
+public class OutboxMessage : BaseEntity
+{
+    public string Type { get; set; } = "email"; // email, notification, etc.
+    public string Payload { get; set; } = string.Empty; // JSON payload
+    public string Status { get; set; } = "Pending"; // Pending, Sent, Failed
+    public DateTimeOffset? SentAt { get; set; }
+    public int RetryCount { get; set; }
+    public DateTimeOffset? NextAttemptAt { get; set; }
+}

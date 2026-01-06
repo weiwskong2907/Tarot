@@ -7,10 +7,11 @@ namespace Tarot.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class ContactMessagesController(IRepository<ContactMessage> messageRepo, IRedisService redisService) : ControllerBase
+public class ContactMessagesController(IRepository<ContactMessage> messageRepo, IRedisService redisService, IEmailService emailService) : ControllerBase
 {
     private readonly IRepository<ContactMessage> _messageRepo = messageRepo;
     private readonly IRedisService _redis = redisService;
+    private readonly IEmailService _emailService = emailService;
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ContactMessageCreateDto dto)
@@ -68,10 +69,20 @@ public class ContactMessagesController(IRepository<ContactMessage> messageRepo, 
     {
         var m = await _messageRepo.GetByIdAsync(id);
         if (m == null) return NotFound();
+        
         m.Reply = dto.Reply;
         m.Status = "Replied";
         m.UpdatedAt = DateTimeOffset.UtcNow;
+        
         await _messageRepo.UpdateAsync(m);
+
+        // Send email notification
+        if (!string.IsNullOrEmpty(m.Email))
+        {
+            await _emailService.SendEmailAsync(m.Email, "Reply to your contact message", 
+                $"Dear {m.Name},\n\nWe have received your message: \"{m.Message}\"\n\nOur reply:\n{dto.Reply}\n\nBest regards,\nTarot Team");
+        }
+
         return Ok(m);
     }
 

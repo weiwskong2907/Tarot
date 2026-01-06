@@ -95,7 +95,7 @@ public class CardsController(IRepository<Card> cardRepo) : ControllerBase
     public async Task<IActionResult> Delete(Guid id)
     {
         var card = await _cardRepo.GetByIdAsync(id);
-        if (card == null) return NotFound();
+        if (card == null) return NoContent();
         await _cardRepo.DeleteAsync(card);
         return NoContent();
     }

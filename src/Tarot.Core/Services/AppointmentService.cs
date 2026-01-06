@@ -8,12 +8,14 @@ public class AppointmentService(
     IRepository<Appointment> appointmentRepo, 
     IRepository<Service> serviceRepo,
     IRepository<AppUser> userRepo,
+    IRepository<BlockedSlot> blockedSlotRepo,
     IRedisService redisService,
     IEmailService emailService) : IAppointmentService
 {
     private readonly IRepository<Appointment> _appointmentRepo = appointmentRepo;
     private readonly IRepository<Service> _serviceRepo = serviceRepo;
     private readonly IRepository<AppUser> _userRepo = userRepo;
+    private readonly IRepository<BlockedSlot> _blockedSlotRepo = blockedSlotRepo;
     private readonly IRedisService _redisService = redisService;
     private readonly IEmailService _emailService = emailService;
 
@@ -35,6 +37,13 @@ public class AppointmentService(
         try
         {
             // 2. Check DB availability
+            // Check Blocked Slots
+            var blockedCount = await _blockedSlotRepo.CountAsync(b => 
+                b.StartTime < endTime && b.EndTime > startTime);
+            
+            if (blockedCount > 0)
+                throw new Exception("Time slot is blocked by admin.");
+
             // Ensure no overlap: (Start < NewEnd) and (End > NewStart)
             var existingCount = await _appointmentRepo.CountAsync(a => a.Status != AppointmentStatus.Cancelled && 
                       a.StartTime < endTime && 
@@ -122,6 +131,12 @@ public class AppointmentService(
 
         try
         {
+            // Check Blocked Slots
+            var blockedCount = await _blockedSlotRepo.CountAsync(b => 
+                b.StartTime < endTime && b.EndTime > startTime);
+            
+            if (blockedCount > 0) throw new Exception("Time slot is blocked by admin.");
+
             // Check Availability (exclude self)
             var count = await _appointmentRepo.CountAsync(a => a.Id != id && 
                 a.Status != AppointmentStatus.Cancelled &&

@@ -31,6 +31,18 @@ public static class DbInitializer
                 await AddMinimalCardsAsync(context);
             }
         }
+
+        if (!context.EmailTemplates.Any(e => e.Slug == "consultation-reply"))
+        {
+            var tpl = new EmailTemplate
+            {
+                Slug = "consultation-reply",
+                SubjectTpl = "Your Consultation Reply",
+                BodyHtml = "<h2>Hello @Model.UserName</h2><p>Your consultation reply:</p><blockquote>@Model.Reply</blockquote><p>Appointment time: @Model.AppointmentTime</p>"
+            };
+            await context.EmailTemplates.AddAsync(tpl);
+            await context.SaveChangesAsync();
+        }
     }
 
     public static async Task SeedIdentityAsync(IServiceProvider services)

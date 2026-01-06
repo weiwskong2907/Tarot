@@ -19,4 +19,11 @@ public class LoyaltyService : ILoyaltyService
 
         return Task.FromResult(points);
     }
+
+    public string GetLoyaltyLevel(int appointmentCount)
+    {
+        if (appointmentCount >= 11) return "Gold";
+        if (appointmentCount >= 6) return "Silver";
+        return "Bronze";
+    }
 }

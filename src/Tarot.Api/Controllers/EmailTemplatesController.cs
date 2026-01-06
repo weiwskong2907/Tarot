@@ -2,15 +2,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Tarot.Core.Entities;
 using Tarot.Core.Interfaces;
+using System.Dynamic;
 
 namespace Tarot.Api.Controllers;
 
 [Authorize(Policy = "DESIGN_EDIT")]
 [ApiController]
 [Route("api/v1/[controller]")]
-public class EmailTemplatesController(IRepository<EmailTemplate> templateRepo) : ControllerBase
+public class EmailTemplatesController(
+    IRepository<EmailTemplate> templateRepo,
+    IEmailService emailService) : ControllerBase
 {
     private readonly IRepository<EmailTemplate> _templateRepo = templateRepo;
+    private readonly IEmailService _emailService = emailService;
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
@@ -79,6 +83,31 @@ public class EmailTemplatesController(IRepository<EmailTemplate> templateRepo) :
         await _templateRepo.DeleteAsync(t);
         return NoContent();
     }
+
+    [HttpPost("preview")]
+    public async Task<IActionResult> Preview([FromBody] EmailTemplatePreviewDto dto)
+    {
+        // Convert dictionary to ExpandoObject for property access in Razor
+        dynamic model = new ExpandoObject();
+        var modelDict = (IDictionary<string, object>)model;
+        foreach (var kvp in dto.Model)
+        {
+            modelDict[kvp.Key] = kvp.Value;
+        }
+
+        var result = await _emailService.RenderTemplateAsync(dto.Slug, model);
+        if (result.StartsWith("Template '") && result.EndsWith("' not found."))
+        {
+            return NotFound(result);
+        }
+        return Ok(new { Html = result });
+    }
+}
+
+public class EmailTemplatePreviewDto
+{
+    public string Slug { get; set; } = string.Empty;
+    public Dictionary<string, object> Model { get; set; } = [];
 }
 
 public class EmailTemplateCreateDto

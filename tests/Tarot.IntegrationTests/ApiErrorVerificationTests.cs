@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Tarot.Api.Dtos;
 
@@ -341,5 +342,149 @@ public class ApiErrorVerificationTests : IClassFixture<CustomWebApplicationFacto
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
         Environment.SetEnvironmentVariable("MOCK_PAYMENT_FAIL", null);
         Environment.SetEnvironmentVariable("ENABLE_PAYMENT", null);
+    }
+
+    [Fact]
+    public async Task EmailTemplates_Preview_ShouldRenderHtml()
+    {
+        WithPermissions("DESIGN_EDIT");
+        var slug = $"preview-{Guid.NewGuid():N}";
+        var bodyHtml = "<h1>Hello @Model.Name</h1>";
+        
+        // Create template
+        var createDto = new { Slug = slug, SubjectTpl = "Subject", BodyHtml = bodyHtml };
+        var createResp = await _client.PostAsJsonAsync("/api/v1/emailtemplates", createDto);
+        createResp.EnsureSuccessStatusCode();
+
+        // Preview
+        var previewDto = new
+        {
+            Slug = slug,
+            Model = new Dictionary<string, object> { { "Name", "Tester" } }
+        };
+        var resp = await _client.PostAsJsonAsync("/api/v1/emailtemplates/preview", previewDto);
+        resp.EnsureSuccessStatusCode();
+        var json = await resp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        Assert.NotNull(json);
+        Assert.Contains("<h1>Hello Tester</h1>", json!["html"]);
+    }
+
+    [Fact]
+    public async Task EmailTemplates_Preview_NotFound_ShouldReturn404()
+    {
+        WithPermissions("DESIGN_EDIT");
+        var previewDto = new
+        {
+            Slug = "non-existent-slug",
+            Model = new Dictionary<string, object>()
+        };
+        var resp = await _client.PostAsJsonAsync("/api/v1/emailtemplates/preview", previewDto);
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Loyalty_GetPoints_ShouldReturnPoints()
+    {
+        var userId = Guid.NewGuid();
+        _client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        _client.DefaultRequestHeaders.Add("X-Test-UserId", userId.ToString());
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            var user = new Tarot.Core.Entities.AppUser
+            {
+                Id = userId,
+                UserName = "loyaltyuser",
+                Email = "loyalty@example.com",
+                LoyaltyPoints = 100,
+                AppointmentCount = 5
+            };
+            db.Users.Add(user);
+            db.SaveChanges();
+        }
+
+        var resp = await _client.GetAsync("/api/v1/loyalty/points");
+        resp.EnsureSuccessStatusCode();
+        var json = await resp.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        Assert.NotNull(json);
+        Assert.Equal(100, int.Parse(json!["points"].ToString()!));
+        Assert.Equal("Bronze", json!["level"].ToString());
+    }
+
+    [Fact]
+    public async Task Admin_ReplyConsultation_ShouldCompleteAndAwardPoints()
+    {
+        WithPermissions("CONSULTATION_REPLY");
+        var userId = Guid.NewGuid();
+        var apptId = Guid.NewGuid();
+        var serviceId = Guid.NewGuid();
+        
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            var user = new Tarot.Core.Entities.AppUser
+            {
+                Id = userId,
+                UserName = "replyuser",
+                Email = "reply@example.com",
+                LoyaltyPoints = 0,
+                AppointmentCount = 0
+            };
+            db.Users.Add(user);
+            
+            var service = new Tarot.Core.Entities.Service
+            {
+                Id = serviceId,
+                Name = "Reading",
+                Price = 100m,
+                DurationMin = 30
+            };
+            db.Services.Add(service);
+            
+            var appt = new Tarot.Core.Entities.Appointment
+            {
+                Id = apptId,
+                UserId = userId,
+                ServiceId = serviceId,
+                StartTime = DateTimeOffset.UtcNow,
+                EndTime = DateTimeOffset.UtcNow.AddMinutes(30),
+                Status = Tarot.Core.Enums.AppointmentStatus.Confirmed,
+                Price = 100m
+            };
+            db.Appointments.Add(appt);
+            
+            var consultation = new Tarot.Core.Entities.Consultation
+            {
+                AppointmentId = apptId,
+                Question = "My future?"
+            };
+            db.Consultations.Add(consultation);
+            
+            db.SaveChanges();
+        }
+
+        var replyDto = new { Message = "Looks good!" };
+        var resp = await _client.PostAsJsonAsync($"/api/v1/admin/appointments/{apptId}/reply", replyDto);
+        resp.EnsureSuccessStatusCode();
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            var user = await db.Users.FindAsync(userId);
+            var appt = await db.Appointments.FindAsync(apptId);
+            var cons = await db.Consultations.FirstOrDefaultAsync(c => c.AppointmentId == apptId);
+            
+            Assert.NotNull(user);
+            Assert.Equal(100, user!.LoyaltyPoints); // 1.0 multiplier
+            Assert.Equal(1, user.AppointmentCount);
+            
+            Assert.NotNull(appt);
+            Assert.Equal(Tarot.Core.Enums.AppointmentStatus.Completed, appt!.Status);
+            
+            Assert.NotNull(cons);
+            Assert.Equal("Looks good!", cons!.Reply);
+            Assert.NotNull(cons.RepliedAt);
+        }
     }
 }

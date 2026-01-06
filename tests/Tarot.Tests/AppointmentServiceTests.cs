@@ -11,6 +11,7 @@ public class AppointmentServiceTests
     private readonly Mock<IRepository<Appointment>> _mockApptRepo;
     private readonly Mock<IRepository<Service>> _mockServiceRepo;
     private readonly Mock<IRepository<AppUser>> _mockUserRepo;
+    private readonly Mock<IRepository<BlockedSlot>> _mockBlockedSlotRepo;
     private readonly Mock<IRedisService> _mockRedisService;
     private readonly Mock<IEmailService> _mockEmailService;
     private readonly AppointmentService _service;
@@ -20,6 +21,7 @@ public class AppointmentServiceTests
         _mockApptRepo = new Mock<IRepository<Appointment>>();
         _mockServiceRepo = new Mock<IRepository<Service>>();
         _mockUserRepo = new Mock<IRepository<AppUser>>();
+        _mockBlockedSlotRepo = new Mock<IRepository<BlockedSlot>>();
         _mockRedisService = new Mock<IRedisService>();
         _mockEmailService = new Mock<IEmailService>();
 
@@ -34,6 +36,7 @@ public class AppointmentServiceTests
             _mockApptRepo.Object, 
             _mockServiceRepo.Object,
             _mockUserRepo.Object,
+            _mockBlockedSlotRepo.Object,
             _mockRedisService.Object,
             _mockEmailService.Object
         );

@@ -17,6 +17,7 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         var apptId = Guid.NewGuid();
         apptRepo.Setup(r => r.GetByIdAsync(apptId)).ReturnsAsync(new Appointment
         {
@@ -25,7 +26,7 @@ public class FunctionErrorTests
             ServiceId = Guid.NewGuid(),
             Status = AppointmentStatus.Completed
         });
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.RescheduleAppointmentAsync(apptId, Guid.NewGuid(), DateTime.UtcNow));
     }
 
@@ -37,6 +38,7 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         var apptId = Guid.NewGuid();
         apptRepo.Setup(r => r.GetByIdAsync(apptId)).ReturnsAsync(new Appointment
         {
@@ -44,7 +46,7 @@ public class FunctionErrorTests
             UserId = Guid.NewGuid(),
             Status = AppointmentStatus.Pending
         });
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         var ok = await service.CancelAppointmentAsync(apptId, Guid.NewGuid(), null);
         Assert.False(ok);
     }
@@ -129,7 +131,8 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         svcRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync((Service?)null);
         await Assert.ThrowsAsync<Exception>(() => service.CreateAppointmentAsync(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow));
     }
@@ -142,9 +145,10 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         svcRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync(new Service { DurationMin = 30, Price = 100 });
         redis.Setup(r => r.AcquireLockAsync(It.IsAny<string>(), It.IsAny<TimeSpan>())).ReturnsAsync(false);
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.CreateAppointmentAsync(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow));
     }
 
@@ -156,10 +160,11 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         svcRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync(new Service { DurationMin = 30, Price = 100 });
         redis.Setup(r => r.AcquireLockAsync(It.IsAny<string>(), It.IsAny<TimeSpan>())).ReturnsAsync(true);
         apptRepo.Setup(r => r.CountAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Appointment, bool>>>())).ReturnsAsync(1);
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.CreateAppointmentAsync(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow));
     }
 
@@ -171,6 +176,7 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         var apptId = Guid.NewGuid();
         var ownerId = Guid.NewGuid();
         apptRepo.Setup(r => r.GetByIdAsync(apptId)).ReturnsAsync(new Appointment
@@ -180,7 +186,7 @@ public class FunctionErrorTests
             ServiceId = Guid.NewGuid(),
             Status = AppointmentStatus.Pending
         });
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.RescheduleAppointmentAsync(apptId, Guid.NewGuid(), DateTime.UtcNow));
     }
 
@@ -192,8 +198,9 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         apptRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync((Appointment?)null);
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.RescheduleAppointmentAsync(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow));
     }
 
@@ -205,6 +212,7 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         var apptId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var serviceId = Guid.NewGuid();
@@ -216,7 +224,7 @@ public class FunctionErrorTests
             Status = AppointmentStatus.Pending
         });
         svcRepo.Setup(r => r.GetByIdAsync(serviceId)).ReturnsAsync((Service?)null);
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.RescheduleAppointmentAsync(apptId, userId, DateTime.UtcNow));
     }
 
@@ -228,6 +236,7 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         var apptId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var serviceId = Guid.NewGuid();
@@ -240,7 +249,7 @@ public class FunctionErrorTests
         });
         svcRepo.Setup(r => r.GetByIdAsync(serviceId)).ReturnsAsync(new Service { DurationMin = 30 });
         redis.Setup(r => r.AcquireLockAsync(It.IsAny<string>(), It.IsAny<TimeSpan>())).ReturnsAsync(false);
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.RescheduleAppointmentAsync(apptId, userId, DateTime.UtcNow));
     }
 
@@ -252,6 +261,7 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         var apptId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var serviceId = Guid.NewGuid();
@@ -265,7 +275,7 @@ public class FunctionErrorTests
         svcRepo.Setup(r => r.GetByIdAsync(serviceId)).ReturnsAsync(new Service { DurationMin = 30 });
         redis.Setup(r => r.AcquireLockAsync(It.IsAny<string>(), It.IsAny<TimeSpan>())).ReturnsAsync(true);
         apptRepo.Setup(r => r.CountAsync(It.IsAny<System.Linq.Expressions.Expression<Func<Appointment, bool>>>())).ReturnsAsync(1);
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.RescheduleAppointmentAsync(apptId, userId, DateTime.UtcNow));
     }
 
@@ -277,6 +287,7 @@ public class FunctionErrorTests
         var userRepo = new Mock<IRepository<AppUser>>();
         var redis = new Mock<IRedisService>();
         var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
         var apptId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var serviceId = Guid.NewGuid();
@@ -290,7 +301,28 @@ public class FunctionErrorTests
         });
         svcRepo.Setup(r => r.GetByIdAsync(serviceId)).ReturnsAsync(new Service { DurationMin = 30 });
         redis.Setup(r => r.AcquireLockAsync(It.IsAny<string>(), It.IsAny<TimeSpan>())).ReturnsAsync(true);
-        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, redis.Object, email.Object);
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
         await Assert.ThrowsAsync<Exception>(() => service.RescheduleAppointmentAsync(apptId, userId, DateTime.UtcNow));
+    }
+
+    [Fact]
+    public async Task AppointmentService_Create_ShouldThrow_WhenSlotBlocked()
+    {
+        var apptRepo = new Mock<IRepository<Appointment>>();
+        var svcRepo = new Mock<IRepository<Service>>();
+        var userRepo = new Mock<IRepository<AppUser>>();
+        var redis = new Mock<IRedisService>();
+        var email = new Mock<IEmailService>();
+        var blockedRepo = new Mock<IRepository<BlockedSlot>>();
+        
+        svcRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>())).ReturnsAsync(new Service { DurationMin = 60, Price = 100 });
+        redis.Setup(r => r.AcquireLockAsync(It.IsAny<string>(), It.IsAny<TimeSpan>())).ReturnsAsync(true);
+        
+        // Setup BlockedSlot repo to return count > 0
+        blockedRepo.Setup(r => r.CountAsync(It.IsAny<System.Linq.Expressions.Expression<Func<BlockedSlot, bool>>>())).ReturnsAsync(1);
+        
+        var service = new AppointmentService(apptRepo.Object, svcRepo.Object, userRepo.Object, blockedRepo.Object, redis.Object, email.Object);
+        var ex = await Assert.ThrowsAsync<Exception>(() => service.CreateAppointmentAsync(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow));
+        Assert.Equal("Time slot is blocked by admin.", ex.Message);
     }
 }

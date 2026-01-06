@@ -87,4 +87,12 @@ public class EmailService : IEmailService
 
         await SendEmailAsync(to, subject, body, true);
     }
+
+    public async Task<string> RenderTemplateAsync<T>(string templateSlug, T model)
+    {
+        var template = (await _templateRepo.ListAllAsync()).FirstOrDefault(t => t.Slug == templateSlug);
+        if (template == null) return $"Template '{templateSlug}' not found.";
+        
+        return await _razorEngine.CompileRenderStringAsync(template.Slug, template.BodyHtml, model);
+    }
 }

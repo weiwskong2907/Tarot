@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +31,7 @@ if (!builder.Configuration.GetValue<bool>("UseInMemoryDatabase"))
         healthChecks.AddNpgSql(dbConn, name: "Database");
     }
 }
+healthChecks.AddCheck<OutboxHealthCheck>("Outbox");
 
 // Redis Configuration
 var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost";
@@ -112,6 +114,8 @@ builder.Services.AddScoped<IBlogService, BlogService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 // Mock Payment Service (as requested by user in previous turn)
 builder.Services.AddScoped<IPaymentService, MockPaymentService>();
+// Hosted Outbox Processor (gated by env/config)
+builder.Services.AddHostedService<Tarot.Api.OutboxProcessorHostedService>();
 
 // Register Plugin Manager
 builder.Services.AddSingleton<IPluginManager>(sp =>
@@ -173,3 +177,23 @@ using (var scope = app.Services.CreateScope())
 app.Run();
 
 public partial class Program { }
+
+internal class OutboxHealthCheck(IServiceProvider services) : IHealthCheck
+{
+    private readonly IServiceProvider _services = services;
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    {
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+        var now = DateTimeOffset.UtcNow;
+        var pending = await db.OutboxMessages.CountAsync(x => x.Status == "Pending", cancellationToken);
+        var failed24h = await db.OutboxMessages.CountAsync(x => x.Status == "Failed" && x.UpdatedAt != null && x.UpdatedAt >= now.AddHours(-24), cancellationToken);
+        var data = new Dictionary<string, object>
+        {
+            ["pending"] = pending,
+            ["failed24h"] = failed24h
+        };
+        var status = failed24h > 10 ? HealthStatus.Degraded : HealthStatus.Healthy;
+        return new HealthCheckResult(status, description: "Outbox status", data: data);
+    }
+}
