@@ -7,16 +7,10 @@ using Tarot.Infrastructure.Data;
 
 namespace Tarot.IntegrationTests;
 
-public class AppointmentsIntegrationTests : IClassFixture<CustomWebApplicationFactory<Program>>
+public class AppointmentsIntegrationTests(CustomWebApplicationFactory<Program> factory) : IClassFixture<CustomWebApplicationFactory<Program>>
 {
-    private readonly CustomWebApplicationFactory<Program> _factory;
-    private readonly HttpClient _client;
-
-    public AppointmentsIntegrationTests(CustomWebApplicationFactory<Program> factory)
-    {
-        _factory = factory;
-        _client = factory.CreateClient();
-    }
+    private readonly CustomWebApplicationFactory<Program> _factory = factory;
+    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task CreateAppointment_ShouldReturnOk()

@@ -6,16 +6,10 @@ using Tarot.Api.Dtos;
 
 namespace Tarot.IntegrationTests;
 
-public class ApiErrorVerificationTests : IClassFixture<CustomWebApplicationFactory<Program>>
+public class ApiErrorVerificationTests(CustomWebApplicationFactory<Program> factory) : IClassFixture<CustomWebApplicationFactory<Program>>
 {
-    private readonly CustomWebApplicationFactory<Program> _factory;
-    private readonly HttpClient _client;
-
-    public ApiErrorVerificationTests(CustomWebApplicationFactory<Program> factory)
-    {
-        _factory = factory;
-        _client = factory.CreateClient();
-    }
+    private readonly CustomWebApplicationFactory<Program> _factory = factory;
+    private readonly HttpClient _client = factory.CreateClient();
 
     private void WithPermissions(params string[] permissions)
     {
