@@ -185,4 +185,161 @@ public class ApiErrorVerificationTests : IClassFixture<CustomWebApplicationFacto
         var resp = await _client.PostAsJsonAsync("/api/v1/admin/trash/restore", body);
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task Services_GetById_NotFound_ShouldReturn404()
+    {
+        var resp = await _client.GetAsync($"/api/v1/services/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Services_CRUD_ShouldSucceed()
+    {
+        var createBody = new { Name = "T Service", Price = 50m, DurationMin = 45, IsActive = true };
+        var createResp = await _client.PostAsJsonAsync("/api/v1/services", createBody);
+        createResp.EnsureSuccessStatusCode();
+        var created = await createResp.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        Assert.NotNull(created);
+        var id = Guid.Parse(created!["id"].ToString()!);
+
+        var getResp = await _client.GetAsync($"/api/v1/services/{id}");
+        getResp.EnsureSuccessStatusCode();
+
+        var updateBody = new { Name = "T Service 2", Price = 60m, DurationMin = 30, IsActive = false };
+        var updateResp = await _client.PutAsJsonAsync($"/api/v1/services/{id}", updateBody);
+        updateResp.EnsureSuccessStatusCode();
+
+        var deleteResp = await _client.DeleteAsync($"/api/v1/services/{id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Slots_ValidService_ShouldReturnSlots()
+    {
+        var serviceId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            db.Services.Add(new Tarot.Core.Entities.Service { Id = serviceId, Name = "S", Price = 30m, DurationMin = 60, IsActive = true });
+            db.SaveChanges();
+        }
+        var date = DateTime.UtcNow.Date;
+        var resp = await _client.GetAsync($"/api/v1/slots?date={date:O}&serviceId={serviceId}");
+        resp.EnsureSuccessStatusCode();
+        var arr = await resp.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+        Assert.NotNull(arr);
+        Assert.True(arr!.Count > 0);
+    }
+
+    [Fact]
+    public async Task Interactive_SelfReading_NotEnoughCards_ShouldReturnBadRequest()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            db.Cards.RemoveRange(db.Cards);
+            db.SaveChanges();
+        }
+        var resp = await _client.PostAsync("/api/v1/self-reading", null);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Blog_Create_DuplicateSlug_ShouldReturnBadRequest()
+    {
+        WithPermissions("BLOG_MANAGE");
+        var slug = $"dup-{Guid.NewGuid():N}";
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            db.BlogPosts.Add(new Tarot.Core.Entities.BlogPost { Title = "t", Slug = slug, Content = "c", CreatedAt = DateTimeOffset.UtcNow });
+            db.SaveChanges();
+        }
+        var dto = new CreateBlogPostDto { Title = "t2", Slug = slug, Content = "c2" };
+        var resp = await _client.PostAsJsonAsync("/api/v1/blogposts", dto);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Appointments_Cancel_Unauthorized_ShouldReturnBadRequest()
+    {
+        var ownerId = Guid.NewGuid();
+        var otherId = Guid.NewGuid().ToString();
+        _client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        _client.DefaultRequestHeaders.Add("X-Test-UserId", otherId);
+        var serviceId = Guid.NewGuid();
+        var apptId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            db.Services.Add(new Tarot.Core.Entities.Service { Id = serviceId, Name = "S", Price = 10m, DurationMin = 30, IsActive = true });
+            db.Appointments.Add(new Tarot.Core.Entities.Appointment
+            {
+                Id = apptId,
+                UserId = ownerId,
+                ServiceId = serviceId,
+                StartTime = DateTimeOffset.UtcNow.AddDays(1),
+                EndTime = DateTimeOffset.UtcNow.AddDays(1).AddMinutes(30),
+                Status = Tarot.Core.Enums.AppointmentStatus.Pending,
+                Price = 10m
+            });
+            db.SaveChanges();
+        }
+        var resp = await _client.PostAsJsonAsync($"/api/v1/appointments/{apptId}/cancel", new CancelAppointmentDto { Reason = "Test" });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Appointments_Reschedule_Limit_ShouldReturnBadRequest()
+    {
+        var userId = Guid.NewGuid().ToString();
+        _client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        _client.DefaultRequestHeaders.Add("X-Test-UserId", userId);
+        var serviceId = Guid.NewGuid();
+        var apptId = Guid.NewGuid();
+        var start = DateTimeOffset.UtcNow.AddDays(3).AddHours(11);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            db.Services.Add(new Tarot.Core.Entities.Service { Id = serviceId, Name = "Svc", Price = 50m, DurationMin = 30, IsActive = true });
+            db.Appointments.Add(new Tarot.Core.Entities.Appointment
+            {
+                Id = apptId,
+                UserId = Guid.Parse(userId),
+                ServiceId = serviceId,
+                StartTime = start,
+                EndTime = start.AddMinutes(30),
+                Status = Tarot.Core.Enums.AppointmentStatus.Pending,
+                Price = 50m,
+                RescheduleCount = 2
+            });
+            db.SaveChanges();
+        }
+        var dto = new RescheduleAppointmentDto { NewStartTime = DateTime.UtcNow.AddDays(4) };
+        var resp = await _client.PostAsJsonAsync($"/api/v1/appointments/{apptId}/reschedule", dto);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Appointments_Create_PaymentFail_ShouldReturnBadRequest()
+    {
+        Environment.SetEnvironmentVariable("ENABLE_PAYMENT", "true");
+        Environment.SetEnvironmentVariable("MOCK_PAYMENT_FAIL", "true");
+        var userId = Guid.NewGuid().ToString();
+        _client.DefaultRequestHeaders.Remove("X-Test-UserId");
+        _client.DefaultRequestHeaders.Add("X-Test-UserId", userId);
+        var serviceId = Guid.NewGuid();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Tarot.Infrastructure.Data.AppDbContext>();
+            db.Services.Add(new Tarot.Core.Entities.Service { Id = serviceId, Name = "PaySvc", Price = 80m, DurationMin = 30, IsActive = true });
+            db.SaveChanges();
+        }
+        var dto = new CreateAppointmentDto { ServiceId = serviceId, StartTime = DateTime.UtcNow.AddDays(2) };
+        var resp = await _client.PostAsJsonAsync("/api/v1/appointments", dto);
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Environment.SetEnvironmentVariable("MOCK_PAYMENT_FAIL", null);
+        Environment.SetEnvironmentVariable("ENABLE_PAYMENT", null);
+    }
 }

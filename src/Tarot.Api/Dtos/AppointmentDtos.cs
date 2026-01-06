@@ -19,6 +19,7 @@ public class AppointmentDto
     public DateTimeOffset EndTime { get; set; }
     public string Status { get; set; } = string.Empty;
     public decimal Price { get; set; }
+    public string? CancellationReason { get; set; }
 }
 
 public class RescheduleAppointmentDto
@@ -32,4 +33,9 @@ public class ConsultationMessageDto
     [Required]
     public string Message { get; set; } = string.Empty;
     public List<string>? ImageUrls { get; set; }
+}
+
+public class CancelAppointmentDto
+{
+    public string? Reason { get; set; }
 }

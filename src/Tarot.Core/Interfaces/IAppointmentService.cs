@@ -7,6 +7,6 @@ public interface IAppointmentService
     Task<Appointment> CreateAppointmentAsync(Guid userId, Guid serviceId, DateTime scheduledTime);
     Task<IReadOnlyList<Appointment>> GetUserAppointmentsAsync(Guid userId);
     Task<Appointment?> GetAppointmentByIdAsync(Guid id);
-    Task<bool> CancelAppointmentAsync(Guid id, Guid userId);
+    Task<bool> CancelAppointmentAsync(Guid id, Guid userId, string? reason = null);
     Task<Appointment> RescheduleAppointmentAsync(Guid id, Guid userId, DateTime newTime);
 }

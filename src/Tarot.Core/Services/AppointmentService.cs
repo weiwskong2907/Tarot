@@ -78,7 +78,7 @@ public class AppointmentService(
     public Task<Appointment?> GetAppointmentByIdAsync(Guid id) =>
         _appointmentRepo.GetByIdAsync(id);
 
-    public async Task<bool> CancelAppointmentAsync(Guid id, Guid userId)
+    public async Task<bool> CancelAppointmentAsync(Guid id, Guid userId, string? reason = null)
     {
         var appointment = await _appointmentRepo.GetByIdAsync(id);
         if (appointment is null || appointment.UserId != userId)
@@ -88,6 +88,10 @@ public class AppointmentService(
             return false;
 
         appointment.Status = AppointmentStatus.Cancelled;
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            appointment.CancellationReason = reason;
+        }
         await _appointmentRepo.UpdateAsync(appointment);
         
         // Return inventory/lock if necessary (implicit by Status change)
@@ -102,6 +106,9 @@ public class AppointmentService(
         
         if (appt.Status == AppointmentStatus.Completed || appt.Status == AppointmentStatus.Cancelled)
             throw new Exception("Cannot reschedule completed or cancelled appointment");
+
+        if (appt.RescheduleCount >= 2)
+            throw new Exception("Reschedule limit reached");
 
         var service = await _serviceRepo.GetByIdAsync(appt.ServiceId) ?? throw new Exception("Service data corrupt");
 

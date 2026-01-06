@@ -141,11 +141,11 @@ public class AppointmentsControllerTests
     {
         // Arrange
         var appointmentId = Guid.NewGuid();
-        _mockAppointmentService.Setup(s => s.CancelAppointmentAsync(appointmentId, _userId))
+        _mockAppointmentService.Setup(s => s.CancelAppointmentAsync(appointmentId, _userId, It.IsAny<string?>()))
             .ReturnsAsync(true);
 
         // Act
-        var result = await _controller.Cancel(appointmentId);
+        var result = await _controller.Cancel(appointmentId, new CancelAppointmentDto { Reason = "User reason" });
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);

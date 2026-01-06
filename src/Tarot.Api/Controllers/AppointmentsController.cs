@@ -113,15 +113,16 @@ public class AppointmentsController : ControllerBase
             StartTime = appointment.StartTime,
             EndTime = appointment.EndTime,
             Status = appointment.Status.ToString(),
-            Price = appointment.Price
+            Price = appointment.Price,
+            CancellationReason = appointment.CancellationReason
         });
     }
 
     [HttpPost("{id}/cancel")]
-    public async Task<IActionResult> Cancel(Guid id)
+    public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelAppointmentDto? dto)
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-        var result = await _appointmentService.CancelAppointmentAsync(id, userId);
+        var result = await _appointmentService.CancelAppointmentAsync(id, userId, dto?.Reason);
 
         if (!result)
             return BadRequest("Cannot cancel appointment");
