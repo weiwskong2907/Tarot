@@ -27,7 +27,7 @@ builder.Services.Configure<AppSettings>(builder.Configuration);
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IAiService, AiInterpretationService>();
 
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateAppointmentDtoValidator>();
@@ -37,6 +37,17 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
 // Rate Limiting
 builder.Services.AddRateLimiter(options =>
@@ -193,8 +204,11 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
+app.UseCors();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
@@ -205,6 +219,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 app.MapHub<Tarot.Api.Hubs.ChatHub>("/chatHub");
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/api/v1/health");

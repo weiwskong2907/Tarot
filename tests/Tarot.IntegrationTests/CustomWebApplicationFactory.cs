@@ -4,7 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Tarot.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication;
-using Tarot.Api.Controllers; // Need this for typeof(AppointmentsController)
+using Tarot.Api.Controllers;
+using Microsoft.Extensions.Diagnostics.HealthChecks; // Added
 
 namespace Tarot.IntegrationTests;
 
@@ -13,6 +14,7 @@ public class CustomWebApplicationFactory<TProgram>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseWebRoot("wwwroot"); // Ensure WebRootPath is set
         builder.ConfigureAppConfiguration((context, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -26,6 +28,16 @@ public class CustomWebApplicationFactory<TProgram>
 
         builder.ConfigureServices(services =>
         {
+            // Remove the NpgSql health check that Program.cs adds
+            services.Configure<HealthCheckServiceOptions>(options =>
+            {
+                var dbCheck = options.Registrations.FirstOrDefault(r => r.Name == "Database");
+                if (dbCheck != null)
+                {
+                    options.Registrations.Remove(dbCheck);
+                }
+            });
+
             // Force load controllers from the API assembly
             services.AddControllers()
                 .AddApplicationPart(typeof(AppointmentsController).Assembly);
