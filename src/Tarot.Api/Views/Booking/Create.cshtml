@@ -1,0 +1,86 @@
+@model BookingViewModel
+
+@{
+    ViewData["Title"] = "Book a Reading";
+}
+
+<div class="container mt-5">
+    <h1 class="text-center mb-5">Book Your Reading</h1>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <form id="bookingForm" asp-action="Create">
+                        <div class="mb-4">
+                            <label class="form-label h5">1. Select Service</label>
+                            <select asp-for="ServiceId" class="form-select form-select-lg">
+                                <option value="">-- Choose a Service --</option>
+                                @foreach (var service in Model.AvailableServices)
+                                {
+                                    <option value="@service.Name">@service.Name ($@service.Price - @service.Duration)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label h5">2. Select Date</label>
+                            <input asp-for="Date" type="date" class="form-control form-control-lg" min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label h5">3. Select Time</label>
+                            <div id="slotsContainer" class="d-flex flex-wrap gap-2">
+                                <p class="text-muted">Please select a date first.</p>
+                            </div>
+                            <input type="hidden" asp-for="StartTime" id="selectedTime" />
+                        </div>
+
+                        <div class="d-grid mt-5">
+                            <button type="submit" class="btn btn-primary btn-lg" disabled id="submitBtn">Confirm Booking</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            $('#Date').change(function() {
+                var date = $(this).val();
+                if (date) {
+                    $.get('/Booking/GetSlots?date=' + date, function(slots) {
+                        var container = $('#slotsContainer');
+                        container.empty();
+                        if (slots.length === 0) {
+                            container.html('<p class="text-warning">No slots available for this date.</p>');
+                            return;
+                        }
+                        
+                        slots.forEach(function(slot) {
+                            var btn = $('<button>')
+                                .addClass('btn btn-outline-primary slot-btn')
+                                .text(slot.time)
+                                .prop('disabled', !slot.isAvailable)
+                                .click(function(e) {
+                                    e.preventDefault();
+                                    $('.slot-btn').removeClass('active');
+                                    $(this).addClass('active');
+                                    $('#selectedTime').val(slot.time);
+                                    $('#submitBtn').prop('disabled', false);
+                                });
+                            container.append(btn);
+                        });
+                    });
+                }
+            });
+        });
+    </script>
+    <style>
+        .slot-btn { width: 100px; }
+        .slot-btn.active { background-color: #0d6efd; color: white; }
+    </style>
+}

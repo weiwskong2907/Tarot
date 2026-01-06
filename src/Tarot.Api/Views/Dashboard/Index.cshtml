@@ -1,0 +1,85 @@
+@model DashboardViewModel
+
+@{
+    ViewData["Title"] = "My Dashboard";
+}
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card bg-primary text-white shadow">
+                <div class="card-body">
+                    <h5 class="card-title">Loyalty Points</h5>
+                    <h2 class="display-4">@Model.LoyaltyPoints</h2>
+                    <p class="card-text">Level: Silver Mystic</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Upcoming Appointments</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.UpcomingAppointments.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var appt in Model.UpcomingAppointments)
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">@appt.ServiceName</h6>
+                                        <small class="text-muted">@appt.Date.ToLongDateString()</small>
+                                    </div>
+                                    <span class="badge bg-success rounded-pill">@appt.Status</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center py-3">No upcoming appointments.</p>
+                        <div class="text-center">
+                            <a asp-controller="Booking" asp-action="Create" class="btn btn-outline-primary btn-sm">Book Now</a>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Recent History</h5>
+                </div>
+                <div class="card-body">
+                     @if (Model.RecentHistory.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Service</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var appt in Model.RecentHistory)
+                                    {
+                                        <tr>
+                                            <td>@appt.ServiceName</td>
+                                            <td>@appt.Date.ToShortDateString()</td>
+                                            <td>@appt.Status</td>
+                                            <td><a href="#" class="btn btn-sm btn-link">View</a></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

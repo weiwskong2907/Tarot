@@ -1,0 +1,31 @@
+@model List<ServiceViewModel>
+
+@{
+    ViewData["Title"] = "Our Services";
+}
+
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4">Our Services</h1>
+        <p class="lead">Choose the reading that resonates with you.</p>
+    </div>
+
+    <div class="row">
+        @foreach (var service in Model)
+        {
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 shadow-sm hover-shadow transition-all">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-star text-warning fa-2x"></i>
+                        </div>
+                        <h3 class="card-title">@service.Name</h3>
+                        <p class="card-text text-muted">@service.Description</p>
+                        <h4 class="text-primary my-3">$@service.Price <small class="text-muted fs-6">/ @service.Duration</small></h4>
+                        <a asp-controller="Booking" asp-action="Create" class="btn btn-primary w-100 rounded-pill">Book Now</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>

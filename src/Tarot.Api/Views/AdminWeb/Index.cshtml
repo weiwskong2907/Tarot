@@ -1,0 +1,56 @@
+@model AdminDashboardViewModel
+
+@{
+    ViewData["Title"] = "Admin Workbench";
+    Layout = "_Layout"; // Or separate AdminLayout
+}
+
+<div class="container-fluid mt-4">
+    <h1 class="h2 mb-4">Admin Workbench</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-warning mb-3 shadow">
+                <div class="card-header">Pending Orders</div>
+                <div class="card-body">
+                    <h5 class="card-title display-6">@Model.PendingOrders</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-info mb-3 shadow">
+                <div class="card-header">Today's Appointments</div>
+                <div class="card-body">
+                    <h5 class="card-title display-6">@Model.TodaysAppointments</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3 shadow">
+                <div class="card-header">Total Revenue</div>
+                <div class="card-body">
+                    <h5 class="card-title display-6">$@Model.TotalRevenue</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Today's Tasks</h5>
+        </div>
+        <ul class="list-group list-group-flush">
+            @foreach (var task in Model.Tasks)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>@task.Title</strong>
+                        <br/>
+                        <small class="text-muted">Due: @task.DueTime</small>
+                    </div>
+                    <span class="badge bg-danger rounded-pill">@task.Priority</span>
+                </li>
+            }
+        </ul>
+    </div>
+</div>

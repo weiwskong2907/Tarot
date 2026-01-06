@@ -74,9 +74,8 @@ public class ComprehensiveFunctionalityTests(CustomWebApplicationFactory<Program
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var data = await response.Content.ReadFromJsonAsync<dynamic>();
-        Assert.NotNull(data);
-        Assert.Equal(100, (int)data.GetProperty("points").GetInt32());
+        var data = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal(100, data.GetProperty("points").GetInt32());
     }
 
     [Fact]

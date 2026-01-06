@@ -37,6 +37,7 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddCors(options =>
 {
