@@ -45,6 +45,90 @@
 ## Tarot工作流
 
 ```
+## API 清单与 CRUD 覆盖
+- Base URL: /api/v1
+- Auth
+  - POST /auth/register 实现于 [AuthController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AuthController.cs#L28-L57)
+  - POST /auth/login 实现于 [AuthController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AuthController.cs#L59-L77)
+- Services
+  - GET /services 实现于 [ServicesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ServicesController.cs#L18-L30)
+  - GET /services/{id} 实现于 [ServicesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ServicesController.cs#L32-L45)
+  - POST /services 实现于 [ServicesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ServicesController.cs#L47-L69)
+  - PUT /services/{id} 实现于 [ServicesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ServicesController.cs#L71-L89)
+  - DELETE /services/{id} 实现于 [ServicesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ServicesController.cs#L91-L99)
+- Slots
+  - GET /slots?date=YYYY-MM-DD&serviceId=... 实现于 [SlotsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SlotsController.cs#L20-L63)
+- Appointments (User)
+  - POST /appointments 实现于 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L34-L80)
+  - GET /appointments 实现于 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L82-L99)
+  - GET /appointments/{id} 实现于 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L101-L118)
+  - POST /appointments/{id}/cancel 实现于 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L120-L130)
+  - POST /appointments/{id}/reschedule 实现于 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L132-L145)
+  - POST /appointments/{id}/consultation 实现于 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L147-L184)
+  - GET /appointments/{id}/calendar (.ics) 实现于 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L186-L205)
+- Appointments (Admin)
+  - POST /admin/appointments/{id}/reply 实现于 [AdminController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AdminController.cs#L58-L94)
+- Interactive
+  - POST /daily-draw 实现于 [InteractiveController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/InteractiveController.cs#L24-L63)
+  - POST /self-reading 实现于 [InteractiveController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/InteractiveController.cs#L65-L112)
+- Blog
+  - GET /blogposts 实现于 [BlogPostsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/BlogPostsController.cs#L15-L24)
+  - GET /blogposts/{slug} 实现于 [BlogPostsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/BlogPostsController.cs#L26-L40)
+  - POST /blogposts 实现于 [BlogPostsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/BlogPostsController.cs#L42-L62)
+  - PUT /blogposts/{id} 实现于 [BlogPostsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/BlogPostsController.cs#L64-L78)
+  - DELETE /blogposts/{id} 实现于 [BlogPostsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/BlogPostsController.cs#L80-L87)
+- Settings
+  - PUT /settings/design 实现于 [SettingsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SettingsController.cs#L12-L34)
+- Plugins
+  - GET /plugins 实现于 [PluginsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/PluginsController.cs#L11-L20)
+-
+- Cards
+  - GET /cards 实现于 [CardsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/CardsController.cs#L12-L30)
+  - GET /cards/{id} 实现于 [CardsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/CardsController.cs#L32-L39)
+  - POST /cards (KNOWLEDGE_EDIT) 实现于 [CardsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/CardsController.cs#L41-L59)
+  - PUT /cards/{id} (KNOWLEDGE_EDIT) 实现于 [CardsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/CardsController.cs#L61-L77)
+  - DELETE /cards/{id} (KNOWLEDGE_EDIT) 实现于 [CardsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/CardsController.cs#L79-L88)
+- SiteSettings
+  - GET /sitesettings (DESIGN_EDIT) 实现于 [SiteSettingsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SiteSettingsController.cs#L12-L27)
+  - GET /sitesettings/{id} (DESIGN_EDIT) 实现于 [SiteSettingsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SiteSettingsController.cs#L29-L35)
+  - GET /sitesettings/by-key/{key} (DESIGN_EDIT) 实现于 [SiteSettingsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SiteSettingsController.cs#L37-L44)
+  - POST /sitesettings (DESIGN_EDIT) 实现于 [SiteSettingsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SiteSettingsController.cs#L46-L62)
+  - PUT /sitesettings/{id} (DESIGN_EDIT) 实现于 [SiteSettingsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SiteSettingsController.cs#L64-L74)
+  - DELETE /sitesettings/{id} (DESIGN_EDIT) 实现于 [SiteSettingsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SiteSettingsController.cs#L76-L84)
+- EmailTemplates
+  - GET /emailtemplates (DESIGN_EDIT) 实现于 [EmailTemplatesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/EmailTemplatesController.cs#L12-L28)
+  - GET /emailtemplates/{id} (DESIGN_EDIT) 实现于 [EmailTemplatesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/EmailTemplatesController.cs#L30-L36)
+  - GET /emailtemplates/by-slug/{slug} (DESIGN_EDIT) 实现于 [EmailTemplatesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/EmailTemplatesController.cs#L38-L45)
+  - POST /emailtemplates (DESIGN_EDIT) 实现于 [EmailTemplatesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/EmailTemplatesController.cs#L47-L65)
+  - PUT /emailtemplates/{id} (DESIGN_EDIT) 实现于 [EmailTemplatesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/EmailTemplatesController.cs#L67-L78)
+  - DELETE /emailtemplates/{id} (DESIGN_EDIT) 实现于 [EmailTemplatesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/EmailTemplatesController.cs#L80-L88)
+- ContactMessages
+  - POST /contactmessages 实现于 [ContactMessagesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ContactMessagesController.cs#L12-L27)
+  - GET /contactmessages (INBOX_MANAGE) 实现于 [ContactMessagesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ContactMessagesController.cs#L29-L45)
+  - GET /contactmessages/{id} (INBOX_MANAGE) 实现于 [ContactMessagesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ContactMessagesController.cs#L47-L54)
+  - PUT /contactmessages/{id}/reply (INBOX_MANAGE) 实现于 [ContactMessagesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ContactMessagesController.cs#L56-L66)
+  - DELETE /contactmessages/{id} (INBOX_MANAGE) 实现于 [ContactMessagesController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/ContactMessagesController.cs#L68-L76)
+
+## 软删除校验与覆盖
+- 全局过滤: 已在 [AppDbContext.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Infrastructure/Data/AppDbContext.cs#L22-L36) 为所有主要实体启用 DeletedAt==null 过滤。
+- 仓储删除: 已将通用仓储删除改为软删除，见 [EfRepository.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Infrastructure/Data/EfRepository.cs#L33-L53) 的 DeleteAsync，当实体包含 DeletedAt 字段时设置当前时间并保存。
+- 实体字段: 迁移快照显示所有核心表包含 DeletedAt 字段，如 [AppDbContextModelSnapshot.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Infrastructure/Migrations/AppDbContextModelSnapshot.cs#L239-L279) 和 [UpdateEntities.Designer.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Infrastructure/Migrations/20260105191242_UpdateEntities.Designer.cs#L242-L279)。
+
+## 与《Tarot Workflow.txt》一致性检查结论
+- 预约闭环
+  - 查询时段: 已提供 GET /slots，支持预约与闭锁叠加计算，详见 [SlotsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/SlotsController.cs#L20-L63)。
+  - 下单与支付: POST /appointments 按环境变量 ENABLE_PAYMENT 控制支付流程，详见 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L34-L64)。
+  - 咨询: POST /appointments/{id}/consultation 已实现，详见 [AppointmentsController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AppointmentsController.cs#L147-L184)。
+  - 管理员回复与完结: POST /admin/appointments/{id}/reply 已实现，详见 [AdminController.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Controllers/AdminController.cs#L58-L94)。
+  - 自动化机器人: 后台任务在 [AppointmentCleanupWorker.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Worker/AppointmentCleanupWorker.cs#L64-L129) 中实现自动取消/自动完结与积分发放。
+- 权限策略
+  - 使用 AddAuthorizationBuilder 注册策略，参见 [Program.cs](file:///c:/Users/User/Desktop/Tarot/src/Tarot.Api/Program.cs)。
+- 系统配置
+  - 设计配置 PUT /settings/design 已实现。
+- 互动功能
+  - 每日一抽与自助占卜均已实现，见 InteractiveController。
+
+结论：当前代码已覆盖工作流列出的核心 API，并为 Services 与 BlogPosts 暴露了完整 CRUD。删除操作统一为软删除，查询默认过滤已软删除数据。
 塔罗牌预约与咨询全功能平台 - 全栈开发规格说明书 v9.1 (C# .NET Edition)
 文档状态: Final / Ready for Development 技术栈: C# .NET 8.0 Only 文档目的: 为开发团队提供单一的、无歧义的执行标准，涵盖架构、逻辑、数据与界面。
 0. 架构与技术栈 (Architecture & Tech Stack)

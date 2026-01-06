@@ -163,6 +163,132 @@ public class AdminController(
         }
         return Ok(new { Message = "Permissions updated", userId = id, permissions = request.Permissions });
     }
+
+    [Authorize(Policy = "TRASH_MANAGE")]
+    [HttpGet("trash")]
+    public async Task<IActionResult> GetTrash([FromQuery] string entity)
+    {
+        switch ((entity ?? "").ToLowerInvariant())
+        {
+            case "cards":
+                {
+                    var list = await _dbContext.Cards.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.Name, x.DeletedAt }));
+                }
+            case "services":
+                {
+                    var list = await _dbContext.Services.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.Name, x.DeletedAt }));
+                }
+            case "appointments":
+                {
+                    var list = await _dbContext.Appointments.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.UserId, x.ServiceId, x.DeletedAt }));
+                }
+            case "consultations":
+                {
+                    var list = await _dbContext.Consultations.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.AppointmentId, x.DeletedAt }));
+                }
+            case "blogposts":
+                {
+                    var list = await _dbContext.BlogPosts.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.Slug, x.DeletedAt }));
+                }
+            case "sitesettings":
+                {
+                    var list = await _dbContext.SiteSettings.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.Key, x.DeletedAt }));
+                }
+            case "emailtemplates":
+                {
+                    var list = await _dbContext.EmailTemplates.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.Slug, x.DeletedAt }));
+                }
+            case "contactmessages":
+                {
+                    var list = await _dbContext.ContactMessages.IgnoreQueryFilters().Where(x => x.DeletedAt != null).ToListAsync();
+                    return Ok(list.Select(x => new { x.Id, x.Email, x.DeletedAt }));
+                }
+        }
+        return BadRequest("Unknown entity");
+    }
+
+    [Authorize(Policy = "TRASH_MANAGE")]
+    [HttpPost("trash/restore")]
+    public async Task<IActionResult> Restore([FromBody] RestoreRequest request)
+    {
+        var entity = (request.Entity ?? "").ToLowerInvariant();
+        if (request.Id == Guid.Empty) return BadRequest("Invalid id");
+        switch (entity)
+        {
+            case "cards":
+                {
+                    var x = await _dbContext.Cards.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+            case "services":
+                {
+                    var x = await _dbContext.Services.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+            case "appointments":
+                {
+                    var x = await _dbContext.Appointments.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+            case "consultations":
+                {
+                    var x = await _dbContext.Consultations.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+            case "blogposts":
+                {
+                    var x = await _dbContext.BlogPosts.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+            case "sitesettings":
+                {
+                    var x = await _dbContext.SiteSettings.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+            case "emailtemplates":
+                {
+                    var x = await _dbContext.EmailTemplates.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+            case "contactmessages":
+                {
+                    var x = await _dbContext.ContactMessages.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == request.Id);
+                    if (x == null) return NotFound();
+                    x.DeletedAt = null;
+                    await _dbContext.SaveChangesAsync();
+                    return Ok(new { Message = "Restored", x.Id });
+                }
+        }
+        return BadRequest("Unknown entity");
+    }
 }
 
 public class CancelRequest { public string? Reason { get; set; } }
@@ -170,3 +296,4 @@ public class ReplyRequest { public string Message { get; set; } = string.Empty; 
 public class BlockSlotRequest { public DateTimeOffset StartTime { get; set; } public DateTimeOffset EndTime { get; set; } public string? Reason { get; set; } }
 public class CreateStaffRequest { public string Email { get; set; } = string.Empty; public string FullName { get; set; } = string.Empty; public string Password { get; set; } = string.Empty; public List<string>? Permissions { get; set; } }
 public class UpdatePermissionsRequest { public List<string>? Permissions { get; set; } }
+public class RestoreRequest { public string Entity { get; set; } = string.Empty; public Guid Id { get; set; } }

@@ -79,6 +79,8 @@ authBuilder.AddPolicy("FINANCE_VIEW", policy => policy.RequireClaim("permission"
 authBuilder.AddPolicy("BLOG_MANAGE", policy => policy.RequireClaim("permission", "BLOG_MANAGE"));
 authBuilder.AddPolicy("KNOWLEDGE_EDIT", policy => policy.RequireClaim("permission", "KNOWLEDGE_EDIT"));
 authBuilder.AddPolicy("DESIGN_EDIT", policy => policy.RequireClaim("permission", "DESIGN_EDIT"));
+authBuilder.AddPolicy("INBOX_MANAGE", policy => policy.RequireClaim("permission", "INBOX_MANAGE"));
+authBuilder.AddPolicy("TRASH_MANAGE", policy => policy.RequireClaim("permission", "TRASH_MANAGE"));
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "dev-secret-key-change-me";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "TarotIssuer";
@@ -151,12 +153,15 @@ using (var scope = app.Services.CreateScope())
         if (context.Database.IsRelational())
         {
             context.Database.Migrate(); // Ensure DB is created
+            await DbInitializer.SeedAsync(context);
+            await DbInitializer.SeedIdentityAsync(services);
         }
         else
         {
              context.Database.EnsureCreated();
+             await DbInitializer.SeedAsync(context);
+             // Skip Identity seeding for InMemory (test/dev) to avoid duplicate role issues
         }
-        await DbInitializer.SeedAsync(context);
     }
     catch (Exception ex)
     {

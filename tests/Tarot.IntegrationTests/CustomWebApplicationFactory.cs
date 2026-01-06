@@ -17,7 +17,10 @@ public class CustomWebApplicationFactory<TProgram>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                { "UseInMemoryDatabase", "true" }
+                { "UseInMemoryDatabase", "true" },
+                { "Jwt:Key", "01234567890123456789012345678901" },
+                { "Jwt:Issuer", "TestIssuer" },
+                { "Jwt:Audience", "TestAudience" }
             });
         });
 

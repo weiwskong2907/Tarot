@@ -33,6 +33,45 @@ public static class DbInitializer
         }
     }
 
+    public static async Task SeedIdentityAsync(IServiceProvider services)
+    {
+        var userManager = services.GetService(typeof(Microsoft.AspNetCore.Identity.UserManager<AppUser>)) as Microsoft.AspNetCore.Identity.UserManager<AppUser>;
+        var roleManager = services.GetService(typeof(Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>>)) as Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>>;
+        if (userManager == null || roleManager == null) return;
+
+        // If no users exist, create default Super Admin from environment variables
+        if (!(await userManager.Users.AnyAsync()))
+        {
+            var email = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_EMAIL") ?? "admin@example.com";
+            var password = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_PASSWORD") ?? "Passw0rd!";
+            var fullName = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_NAME") ?? "Super Admin";
+            var permissionsEnv = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_PERMISSIONS");
+            var permissions = string.IsNullOrWhiteSpace(permissionsEnv)
+                ? new List<string> { "DESIGN_EDIT", "KNOWLEDGE_EDIT", "SCHEDULE_MANAGE", "CONSULTATION_REPLY", "FINANCE_VIEW", "BLOG_MANAGE", "TRASH_MANAGE", "INBOX_MANAGE" }
+                : System.Text.Json.JsonSerializer.Deserialize<List<string>>(permissionsEnv) ?? new List<string>();
+
+            var roleName = "SuperAdmin";
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                await roleManager.CreateAsync(new Microsoft.AspNetCore.Identity.IdentityRole<Guid>(roleName));
+            }
+
+            var admin = new AppUser
+            {
+                UserName = email,
+                Email = email,
+                FullName = fullName,
+                CreatedAt = DateTimeOffset.UtcNow,
+                Permissions = System.Text.Json.JsonSerializer.Serialize(permissions)
+            };
+            var result = await userManager.CreateAsync(admin, password);
+            if (result.Succeeded)
+            {
+                await userManager.AddToRoleAsync(admin, roleName);
+            }
+        }
+    }
+
     public static async Task<bool> ReloadCardsAsync(AppDbContext context)
     {
         var baseDir = AppDomain.CurrentDomain.BaseDirectory;

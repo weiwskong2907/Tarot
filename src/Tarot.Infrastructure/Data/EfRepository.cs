@@ -22,6 +22,11 @@ public class EfRepository<T>(AppDbContext dbContext) : IRepository<T> where T : 
         return await _dbContext.Set<T>().Where(predicate).ToListAsync();
     }
 
+    public async Task<IReadOnlyList<T>> ListAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate, int skip, int take)
+    {
+        return await _dbContext.Set<T>().Where(predicate).Skip(skip).Take(take).ToListAsync();
+    }
+
     public async Task<T?> FirstOrDefaultAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate)
     {
         return await _dbContext.Set<T>().FirstOrDefaultAsync(predicate);
@@ -47,7 +52,16 @@ public class EfRepository<T>(AppDbContext dbContext) : IRepository<T> where T : 
 
     public async Task DeleteAsync(T entity)
     {
-        _dbContext.Set<T>().Remove(entity);
+        var prop = typeof(T).GetProperty("DeletedAt");
+        if (prop != null && prop.PropertyType == typeof(DateTimeOffset?))
+        {
+            prop.SetValue(entity, DateTimeOffset.UtcNow);
+            _dbContext.Entry(entity).State = EntityState.Modified;
+        }
+        else
+        {
+            _dbContext.Set<T>().Remove(entity);
+        }
         await _dbContext.SaveChangesAsync();
     }
 }
