@@ -15,7 +15,7 @@ namespace Tarot.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/admin")]
-public class AdminController(
+public partial class AdminController(
     IRepository<Appointment> apptRepo,
     IRepository<BlockedSlot> blockedSlotRepo,
     IRepository<Consultation> consultationRepo,
@@ -201,7 +201,7 @@ public class AdminController(
                     TemplateSlug = "consultation-reply",
                     Model = new
                     {
-                        UserName = appt.User.UserName,
+                        appt.User.UserName,
                         AppointmentTime = appt.StartTime,
                         Reply = request.Message,
                         Link = $"https://tarot-app.com/appointments/{appt.Id}"
@@ -212,20 +212,20 @@ public class AdminController(
                 await _dbContext.SaveChangesAsync();
             }
             else
-            {
-                try
                 {
-                    await _emailService.SendTemplateEmailAsync(appt.User.Email, "consultation-reply", new
+                    try
                     {
-                        UserName = appt.User.UserName,
+                        await _emailService.SendTemplateEmailAsync(appt.User.Email, "consultation-reply", new
+                        {
+                        appt.User.UserName,
                         AppointmentTime = appt.StartTime,
                         Reply = request.Message,
                         Link = $"https://tarot-app.com/appointments/{appt.Id}"
-                    });
+                        });
+                    }
+                    catch { }
                 }
-                catch { }
             }
-        }
 
         return Ok(new { Message = "Reply sent and appointment completed" });
     }
@@ -254,7 +254,7 @@ public class AdminController(
                 {
                     ActorId = adminId,
                     Action = "BlockSlot",
-                    Details = JsonSerializer.Serialize(new { Start = request.StartTime, End = request.EndTime, Reason = request.Reason }),
+                    Details = JsonSerializer.Serialize(new { Start = request.StartTime, End = request.EndTime, request.Reason }),
                     IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
                 };
                 _dbContext.AuditLogs.Add(log);
@@ -282,7 +282,7 @@ public class AdminController(
             {
                 ActorId = adminId,
                 Action = "BlockSlot",
-                Details = JsonSerializer.Serialize(new { Start = request.StartTime, End = request.EndTime, Reason = request.Reason }),
+                Details = JsonSerializer.Serialize(new { Start = request.StartTime, End = request.EndTime, request.Reason }),
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
             };
             _dbContext.AuditLogs.Add(log);
@@ -302,18 +302,13 @@ public class AdminController(
         if (to.HasValue) q = q.Where(x => x.CreatedAt <= to.Value);
         if (!string.IsNullOrWhiteSpace(ip)) q = q.Where(x => x.IpAddress == ip);
         var desc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
-        switch ((sortBy ?? "createdAt").ToLowerInvariant())
+        var key = (sortBy ?? "createdAt").ToLowerInvariant();
+        q = key switch
         {
-            case "actorid":
-                q = desc ? q.OrderByDescending(x => x.ActorId) : q.OrderBy(x => x.ActorId);
-                break;
-            case "action":
-                q = desc ? q.OrderByDescending(x => x.Action) : q.OrderBy(x => x.Action);
-                break;
-            default:
-                q = desc ? q.OrderByDescending(x => x.CreatedAt) : q.OrderBy(x => x.CreatedAt);
-                break;
-        }
+            "actorid" => desc ? q.OrderByDescending(x => x.ActorId) : q.OrderBy(x => x.ActorId),
+            "action" => desc ? q.OrderByDescending(x => x.Action) : q.OrderBy(x => x.Action),
+            _ => desc ? q.OrderByDescending(x => x.CreatedAt) : q.OrderBy(x => x.CreatedAt)
+        };
         var total = await q.CountAsync();
         var items = await q.Skip(Math.Max(0, (page - 1) * pageSize)).Take(pageSize).ToListAsync();
         return Ok(new
@@ -393,17 +388,30 @@ public class AdminController(
     private static string? MaskDetails(string? details)
     {
         if (string.IsNullOrEmpty(details)) return details;
-        var masked = Regex.Replace(details, @"([A-Za-z0-9_.+\-]+)@([A-Za-z0-9\-]+)\.([A-Za-z0-9\-.]+)", m =>
+        var masked = MaskingRegexes.Email().Replace(details, m =>
         {
             var u = m.Groups[1].Value;
             var d1 = m.Groups[2].Value;
             var d2 = m.Groups[3].Value;
-            var um = u.Length <= 2 ? new string('*', u.Length) : u.Substring(0, 2) + new string('*', Math.Max(0, u.Length - 2));
-            var d1m = d1.Length <= 2 ? new string('*', d1.Length) : d1.Substring(0, 2) + new string('*', Math.Max(0, d1.Length - 2));
+            var um = u.Length <= 2
+                ? new string('*', u.Length)
+                : string.Concat(u.AsSpan(0, 2), new string('*', Math.Max(0, u.Length - 2)));
+            var d1m = d1.Length <= 2
+                ? new string('*', d1.Length)
+                : string.Concat(d1.AsSpan(0, 2), new string('*', Math.Max(0, d1.Length - 2)));
             return $"{um}@{d1m}.{d2}";
         });
-        masked = Regex.Replace(masked, @"\b[0-9]{16,}\b", m => new string('*', m.Value.Length));
+        masked = MaskingRegexes.LongNumbers().Replace(masked, m => new string('*', m.Value.Length));
         return masked;
+    }
+
+    private static partial class MaskingRegexes
+    {
+        [GeneratedRegex(@"([A-Za-z0-9_.+\-]+)@([A-Za-z0-9\-]+)\.([A-Za-z0-9\-.]+)", RegexOptions.CultureInvariant)]
+        public static partial Regex Email();
+
+        [GeneratedRegex(@"\b[0-9]{16,}\b", RegexOptions.CultureInvariant)]
+        public static partial Regex LongNumbers();
     }
 
     private static object? ToModel(JsonElement el)

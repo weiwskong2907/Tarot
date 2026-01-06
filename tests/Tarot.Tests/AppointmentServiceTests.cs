@@ -30,7 +30,7 @@ public class AppointmentServiceTests
             .ReturnsAsync(true);
 
         // Setup default repo returns
-        _mockApptRepo.Setup(r => r.ListAllAsync()).ReturnsAsync(new List<Appointment>());
+        _mockApptRepo.Setup(r => r.ListAllAsync()).ReturnsAsync([]);
 
         _service = new AppointmentService(
             _mockApptRepo.Object, 

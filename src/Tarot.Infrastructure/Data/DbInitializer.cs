@@ -8,6 +8,8 @@ namespace Tarot.Infrastructure.Data;
 
 public static class DbInitializer
 {
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     public static async Task SeedAsync(AppDbContext context)
     {
         if (!context.Set<Service>().Any())
@@ -47,9 +49,9 @@ public static class DbInitializer
 
     public static async Task SeedIdentityAsync(IServiceProvider services)
     {
-        var userManager = services.GetService(typeof(Microsoft.AspNetCore.Identity.UserManager<AppUser>)) as Microsoft.AspNetCore.Identity.UserManager<AppUser>;
-        var roleManager = services.GetService(typeof(Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>>)) as Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>>;
-        if (userManager == null || roleManager == null) return;
+        if (services.GetService(typeof(Microsoft.AspNetCore.Identity.UserManager<AppUser>)) is not Microsoft.AspNetCore.Identity.UserManager<AppUser> userManager ||
+            services.GetService(typeof(Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>>)) is not Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>> roleManager)
+            return;
 
         // If no users exist, create default Super Admin from environment variables
         if (!(await userManager.Users.AnyAsync()))
@@ -59,8 +61,8 @@ public static class DbInitializer
             var fullName = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_NAME") ?? "Super Admin";
             var permissionsEnv = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_PERMISSIONS");
             var permissions = string.IsNullOrWhiteSpace(permissionsEnv)
-                ? new List<string> { "DESIGN_EDIT", "KNOWLEDGE_EDIT", "SCHEDULE_MANAGE", "CONSULTATION_REPLY", "FINANCE_VIEW", "BLOG_MANAGE", "TRASH_MANAGE", "INBOX_MANAGE" }
-                : System.Text.Json.JsonSerializer.Deserialize<List<string>>(permissionsEnv) ?? new List<string>();
+                ? ["DESIGN_EDIT", "KNOWLEDGE_EDIT", "SCHEDULE_MANAGE", "CONSULTATION_REPLY", "FINANCE_VIEW", "BLOG_MANAGE", "TRASH_MANAGE", "INBOX_MANAGE"]
+                : System.Text.Json.JsonSerializer.Deserialize<List<string>>(permissionsEnv) ?? [];
 
             var roleName = "SuperAdmin";
             if (!await roleManager.RoleExistsAsync(roleName))
@@ -91,15 +93,14 @@ public static class DbInitializer
         var jsonPath = Path.Combine(configDir, "cards.json");
         var csvPath = Path.Combine(configDir, "cards.csv");
 
-        List<CardSeedItem> items = new();
+        List<CardSeedItem> items = [];
 
         try
         {
             if (File.Exists(jsonPath))
             {
                 var json = await File.ReadAllTextAsync(jsonPath);
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                items = JsonSerializer.Deserialize<List<CardSeedItem>>(json, options) ?? new List<CardSeedItem>();
+                items = JsonSerializer.Deserialize<List<CardSeedItem>>(json, _jsonOptions) ?? [];
             }
             else if (File.Exists(csvPath))
             {
@@ -189,7 +190,7 @@ public static class DbInitializer
                 var keywords = parts[6].Trim();
                 if (!string.IsNullOrEmpty(keywords))
                 {
-                    item.Keywords = keywords.Split(';').Select(k => k.Trim()).ToList();
+                    item.Keywords = [.. keywords.Split(';').Select(k => k.Trim())];
                 }
             }
             items.Add(item);
