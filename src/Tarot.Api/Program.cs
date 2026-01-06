@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Tarot.Core.Entities;
 using Tarot.Core.Interfaces;
 using Tarot.Core.Services;
+using Tarot.Core.Settings;
 using Tarot.Infrastructure.Data;
 using Tarot.Infrastructure.Services;
 
@@ -22,7 +23,12 @@ using Tarot.Api.Validators;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.Configure<AppSettings>(builder.Configuration);
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IAiService, AiInterpretationService>();
+
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateAppointmentDtoValidator>();
 
@@ -159,8 +165,12 @@ builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IBlogService, BlogService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<Tarot.Core.Interfaces.IFileStorageService, Tarot.Infrastructure.Services.LocalFileStorageService>();
-// Mock Payment Service (as requested by user in previous turn)
-builder.Services.AddScoped<IPaymentService, MockPaymentService>();
+// Payment Service (Stripe with Mock fallback)
+builder.Services.AddHttpClient<StripePaymentService>();
+builder.Services.AddScoped<IPaymentService, StripePaymentService>();
+// Analytics
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+
 // Hosted Outbox Processor (gated by env/config)
 builder.Services.AddHostedService<Tarot.Api.OutboxProcessorHostedService>();
 
@@ -195,6 +205,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<Tarot.Api.Hubs.ChatHub>("/chatHub");
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/api/v1/health");
 

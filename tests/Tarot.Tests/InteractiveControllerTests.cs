@@ -13,14 +13,16 @@ public class InteractiveControllerTests
 {
     private readonly Mock<IRepository<DailyDrawRecord>> _mockDailyRepo;
     private readonly Mock<IRepository<Card>> _mockCardRepo;
+    private readonly Mock<IAiService> _mockAiService;
     private readonly InteractiveController _controller;
 
     public InteractiveControllerTests()
     {
         _mockDailyRepo = new Mock<IRepository<DailyDrawRecord>>();
         _mockCardRepo = new Mock<IRepository<Card>>();
+        _mockAiService = new Mock<IAiService>();
         
-        _controller = new InteractiveController(_mockDailyRepo.Object, _mockCardRepo.Object);
+        _controller = new InteractiveController(_mockDailyRepo.Object, _mockCardRepo.Object, _mockAiService.Object);
 
         // Setup User context
         var user = new ClaimsPrincipal(new ClaimsIdentity([
@@ -103,5 +105,33 @@ public class InteractiveControllerTests
         // Assert
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("Not enough cards available for self-reading.", badRequestResult.Value);
+    }
+
+    [Fact]
+    public async Task AiInterpret_ShouldReturnInterpretation_WhenCardsExist()
+    {
+        // Arrange
+        var cardId = Guid.NewGuid();
+        var dto = new Tarot.Api.Dtos.AiInterpretationRequestDto
+        {
+            SpreadType = "Single Card",
+            CardIds = [cardId],
+            Question = "What is my future?"
+        };
+
+        _mockCardRepo.Setup(r => r.GetByIdAsync(cardId))
+            .ReturnsAsync(new Card { Id = cardId, Name = "The Fool" });
+
+        _mockAiService.Setup(s => s.InterpretTarotSpreadAsync("Single Card", It.IsAny<IEnumerable<string>>(), "What is my future?"))
+            .ReturnsAsync("A mystical interpretation.");
+
+        // Act
+        var result = await _controller.AiInterpret(dto);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var val = okResult.Value!;
+        var prop = val.GetType().GetProperty("Interpretation");
+        Assert.Equal("A mystical interpretation.", prop?.GetValue(val));
     }
 }

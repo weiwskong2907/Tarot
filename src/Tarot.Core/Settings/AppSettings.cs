@@ -8,6 +8,22 @@ public class AppSettings
     public OutboxSettings Outbox { get; set; } = new();
     public PaymentSettings Payment { get; set; } = new();
     public AdminSettings Admin { get; set; } = new();
+    public AiSettings Ai { get; set; } = new();
+    public StripeSettings Stripe { get; set; } = new();
+}
+
+public class StripeSettings
+{
+    public string SecretKey { get; set; } = string.Empty;
+    public string PublishableKey { get; set; } = string.Empty;
+    public string WebhookSecret { get; set; } = string.Empty;
+}
+
+public class AiSettings
+{
+    public string Provider { get; set; } = "Mock"; // Mock, OpenAI, Gemini
+    public string ApiKey { get; set; } = "";
+    public string Model { get; set; } = "gpt-3.5-turbo";
 }
 
 public class JwtSettings

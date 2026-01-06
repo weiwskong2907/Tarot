@@ -7,16 +7,42 @@ using System.Text.Json;
 
 using Microsoft.AspNetCore.RateLimiting;
 
+using Tarot.Api.Dtos;
+
 namespace Tarot.Api.Controllers;
 
 [EnableRateLimiting("strict")]
 [Authorize]
 [ApiController]
 [Route("api/v1")]
-public class InteractiveController(IRepository<DailyDrawRecord> dailyRepo, IRepository<Card> cardRepo) : ControllerBase
+public class InteractiveController(IRepository<DailyDrawRecord> dailyRepo, IRepository<Card> cardRepo, IAiService aiService) : ControllerBase
 {
     private readonly IRepository<DailyDrawRecord> _dailyRepo = dailyRepo;
     private readonly IRepository<Card> _cardRepo = cardRepo;
+    private readonly IAiService _aiService = aiService;
+
+    [HttpPost("interactive/ai-interpret")]
+    public async Task<IActionResult> AiInterpret([FromBody] AiInterpretationRequestDto dto)
+    {
+        if (dto.CardIds.Count == 0) return BadRequest("At least one card must be selected.");
+
+        // Fetch card names for interpretation
+        // We can do this by ID.
+        var cardNames = new List<string>();
+        foreach (var id in dto.CardIds)
+        {
+            var card = await _cardRepo.GetByIdAsync(id);
+            if (card != null)
+            {
+                cardNames.Add(card.Name);
+            }
+        }
+
+        if (cardNames.Count == 0) return BadRequest("Invalid card IDs provided.");
+
+        var interpretation = await _aiService.InterpretTarotSpreadAsync(dto.SpreadType, cardNames, dto.Question);
+        return Ok(new { Interpretation = interpretation });
+    }
 
     [HttpPost("daily-draw")]
     public async Task<IActionResult> DailyDraw()

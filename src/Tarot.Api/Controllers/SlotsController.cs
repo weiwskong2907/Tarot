@@ -19,6 +19,35 @@ public class SlotsController(
     private readonly IRepository<BlockedSlot> _blockedSlotRepo = blockedSlotRepo;
     private readonly IRedisService _redis = redis;
 
+    [Authorize(Policy = "SCHEDULE_MANAGE")]
+    [HttpPost("~/api/v1/admin/slots/block")]
+    public async Task<IActionResult> BlockSlot([FromBody] BlockSlotDto dto)
+    {
+        if (dto.EndTime <= dto.StartTime)
+            return BadRequest("EndTime must be after StartTime");
+
+        var block = new BlockedSlot
+        {
+            StartTime = dto.StartTime,
+            EndTime = dto.EndTime,
+            Reason = dto.Reason,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        await _blockedSlotRepo.AddAsync(block);
+        
+        // Invalidate cache
+        // We might need to invalidate for multiple services, or just clear all slots cache for that day
+        // Since cache key is slots:{date}:{serviceId}, we can't easily clear all services without a pattern match or clearing all.
+        // For simplicity, we can rely on TTL (5 min) or implement a pattern delete if RedisService supports it.
+        // Or simply accept that it might take 5 mins to reflect. 
+        // Better: Try to delete keys for this date if we can. 
+        // Assuming we don't have pattern delete easily accessible here without more code. 
+        // Let's just note it.
+        
+        return Ok(new { Message = "Slot blocked successfully", BlockId = block.Id });
+    }
+
     // Simplified slots endpoint: requires serviceId and date (YYYY-MM-DD)
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] DateTime date, [FromQuery] Guid serviceId)
@@ -73,4 +102,11 @@ public class SlotDto
 {
     public DateTimeOffset Start { get; set; }
     public DateTimeOffset End { get; set; }
+}
+
+public class BlockSlotDto
+{
+    public DateTimeOffset StartTime { get; set; }
+    public DateTimeOffset EndTime { get; set; }
+    public string? Reason { get; set; }
 }

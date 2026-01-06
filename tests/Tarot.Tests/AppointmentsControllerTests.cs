@@ -49,7 +49,7 @@ public class AppointmentsControllerTests
         // Mock User Context
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, _userId.ToString())
+            new(ClaimTypes.NameIdentifier, _userId.ToString())
         };
         var identity = new ClaimsIdentity(claims, "TestAuthType");
         var claimsPrincipal = new ClaimsPrincipal(identity);
@@ -135,8 +135,8 @@ public class AppointmentsControllerTests
         // Arrange
         var appointments = new List<Appointment>
         {
-            new Appointment { Id = Guid.NewGuid(), UserId = _userId, Price = 50 },
-            new Appointment { Id = Guid.NewGuid(), UserId = _userId, Price = 100 }
+            new() { Id = Guid.NewGuid(), UserId = _userId, Price = 50 },
+            new() { Id = Guid.NewGuid(), UserId = _userId, Price = 100 }
         };
 
         _mockAppointmentService.Setup(s => s.GetUserAppointmentsAsync(_userId))
