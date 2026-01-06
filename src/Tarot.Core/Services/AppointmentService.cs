@@ -27,7 +27,8 @@ public class AppointmentService(
         var endTime = startTime.AddMinutes(service.DurationMin);
 
         // 1. Redis Distributed Lock to prevent double booking
-        var lockKey = $"lock:appointment:{scheduledTime:yyyyMMddHHmm}";
+        // Use day-level lock to prevent overlapping time slots race conditions
+        var lockKey = $"lock:appointment:day:{scheduledTime:yyyyMMdd}";
         var acquired = await _redisService.AcquireLockAsync(lockKey, TimeSpan.FromSeconds(10));
         if (!acquired)
         {
@@ -125,7 +126,7 @@ public class AppointmentService(
         var endTime = startTime.AddMinutes(service.DurationMin);
 
         // Lock
-        var lockKey = $"lock:appointment:{newTime:yyyyMMddHHmm}";
+        var lockKey = $"lock:appointment:day:{newTime:yyyyMMdd}";
         var acquired = await _redisService.AcquireLockAsync(lockKey, TimeSpan.FromSeconds(10));
         if (!acquired) throw new Exception("System busy, please try again.");
 

@@ -1,39 +1,33 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Tarot.Infrastructure.Data;
 using Tarot.Core.Interfaces;
+using Tarot.Core.Settings;
 
 namespace Tarot.Api;
 
-public class OutboxProcessorHostedService(IServiceProvider services, ILogger<OutboxProcessorHostedService> logger, IConfiguration config) : BackgroundService
+public class OutboxProcessorHostedService(IServiceProvider services, ILogger<OutboxProcessorHostedService> logger, IOptions<AppSettings> settings) : BackgroundService
 {
     private readonly IServiceProvider _services = services;
     private readonly ILogger<OutboxProcessorHostedService> _logger = logger;
-    private readonly IConfiguration _config = config;
+    private readonly AppSettings _settings = settings.Value;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var enabled = (Environment.GetEnvironmentVariable("ENABLE_OUTBOX_PROCESSOR") ?? _config["EnableOutboxProcessor"] ?? "false")
-            .Equals("true", StringComparison.OrdinalIgnoreCase);
-        if (!enabled)
+        if (!_settings.Outbox.EnableProcessor)
         {
             _logger.LogInformation("Outbox processor disabled");
             return;
         }
 
-        var intervalSecStr = Environment.GetEnvironmentVariable("OUTBOX_INTERVAL_SECONDS") ?? _config["Outbox:IntervalSeconds"] ?? "30";
-        var intervalSec = int.TryParse(intervalSecStr, out var s) ? Math.Max(5, s) : 30;
-        var takeStr = Environment.GetEnvironmentVariable("OUTBOX_TAKE") ?? _config["Outbox:Take"] ?? "50";
-        var take = int.TryParse(takeStr, out var t) ? Math.Max(1, t) : 50;
-        var baseBackoffStr = Environment.GetEnvironmentVariable("OUTBOX_BASE_BACKOFF_SECONDS") ?? _config["Outbox:BaseBackoffSeconds"] ?? "30";
-        var maxBackoffStr = Environment.GetEnvironmentVariable("OUTBOX_MAX_BACKOFF_SECONDS") ?? _config["Outbox:MaxBackoffSeconds"] ?? "600";
-        var maxRetriesStr = Environment.GetEnvironmentVariable("OUTBOX_MAX_RETRIES") ?? _config["Outbox:MaxRetries"] ?? "5";
-        var baseBackoff = int.TryParse(baseBackoffStr, out var bb) ? Math.Max(5, bb) : 30;
-        var maxBackoff = int.TryParse(maxBackoffStr, out var mb) ? Math.Max(baseBackoff, mb) : 600;
-        var maxRetries = int.TryParse(maxRetriesStr, out var mr) ? Math.Max(1, mr) : 5;
+        var intervalSec = Math.Max(5, _settings.Outbox.IntervalSeconds);
+        var take = Math.Max(1, _settings.Outbox.Take);
+        var baseBackoff = Math.Max(5, _settings.Outbox.BaseBackoffSeconds);
+        var maxBackoff = Math.Max(baseBackoff, _settings.Outbox.MaxBackoffSeconds);
+        var maxRetries = Math.Max(1, _settings.Outbox.MaxRetries);
 
         _logger.LogInformation("Outbox processor enabled: interval={interval}s, batch={take}", intervalSec, take);
 

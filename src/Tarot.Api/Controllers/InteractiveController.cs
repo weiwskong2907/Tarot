@@ -5,21 +5,18 @@ using Tarot.Core.Entities;
 using Tarot.Core.Interfaces;
 using System.Text.Json;
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace Tarot.Api.Controllers;
 
+[EnableRateLimiting("strict")]
 [Authorize]
 [ApiController]
 [Route("api/v1")]
-public class InteractiveController : ControllerBase
+public class InteractiveController(IRepository<DailyDrawRecord> dailyRepo, IRepository<Card> cardRepo) : ControllerBase
 {
-    private readonly IRepository<DailyDrawRecord> _dailyRepo;
-    private readonly IRepository<Card> _cardRepo;
-
-    public InteractiveController(IRepository<DailyDrawRecord> dailyRepo, IRepository<Card> cardRepo)
-    {
-        _dailyRepo = dailyRepo;
-        _cardRepo = cardRepo;
-    }
+    private readonly IRepository<DailyDrawRecord> _dailyRepo = dailyRepo;
+    private readonly IRepository<Card> _cardRepo = cardRepo;
 
     [HttpPost("daily-draw")]
     public async Task<IActionResult> DailyDraw()
@@ -37,7 +34,7 @@ public class InteractiveController : ControllerBase
         }
 
         // Fetch cards and randomly select one
-        var cards = await _cardRepo.ListAllAsync();
+        var cards = await _cardRepo.ListAllReadOnlyAsync();
         if (cards.Count == 0)
         {
             return BadRequest("No cards available in the deck.");
@@ -65,7 +62,7 @@ public class InteractiveController : ControllerBase
     [HttpPost("self-reading")]
     public async Task<IActionResult> SelfReading()
     {
-        var cards = await _cardRepo.ListAllAsync();
+        var cards = await _cardRepo.ListAllReadOnlyAsync();
         if (cards.Count < 3)
         {
             return BadRequest("Not enough cards available for self-reading.");

@@ -8,6 +8,8 @@ using System.Text.Json;
 using Ical.Net;
 using Ical.Net.CalendarComponents;
 using Ical.Net.DataTypes;
+using Microsoft.Extensions.Options;
+using Tarot.Core.Settings;
 
 namespace Tarot.Api.Controllers;
 
@@ -21,62 +23,69 @@ public class AppointmentsController : ControllerBase
     private readonly IRepository<Appointment> _appointmentRepo;
     private readonly IRepository<Service> _serviceRepo;
     private readonly IRepository<Consultation> _consultationRepo;
+    private readonly AppSettings _settings;
 
-    public AppointmentsController(IAppointmentService appointmentService, IPaymentService paymentService, IRepository<Appointment> appointmentRepo, IRepository<Service> serviceRepo, IRepository<Consultation> consultationRepo)
+    public AppointmentsController(
+        IAppointmentService appointmentService, 
+        IPaymentService paymentService, 
+        IRepository<Appointment> appointmentRepo, 
+        IRepository<Service> serviceRepo, 
+        IRepository<Consultation> consultationRepo,
+        IOptions<AppSettings> settings)
     {
         _appointmentService = appointmentService;
         _paymentService = paymentService;
         _appointmentRepo = appointmentRepo;
         _serviceRepo = serviceRepo;
         _consultationRepo = consultationRepo;
+        _settings = settings.Value;
     }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateAppointmentDto dto)
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-        try
+        
+        var appointment = await _appointmentService.CreateAppointmentAsync(userId, dto.ServiceId, dto.StartTime);
+        
+        // Allow environment variable override for testing
+        var enablePayment = _settings.EnablePayment;
+        var envEnable = Environment.GetEnvironmentVariable("ENABLE_PAYMENT");
+        if (envEnable != null && bool.TryParse(envEnable, out var e))
         {
-            var appointment = await _appointmentService.CreateAppointmentAsync(userId, dto.ServiceId, dto.StartTime);
-            
-            var enablePaymentEnv = Environment.GetEnvironmentVariable("ENABLE_PAYMENT");
-            var enablePayment = string.IsNullOrEmpty(enablePaymentEnv) ? true : enablePaymentEnv.Equals("true", StringComparison.OrdinalIgnoreCase);
+            enablePayment = e;
+        }
 
-            if (!enablePayment)
+        if (!enablePayment)
+        {
+            appointment.Status = Core.Enums.AppointmentStatus.Confirmed;
+            appointment.PaymentStatus = Core.Enums.PaymentStatus.Skipped;
+            await _appointmentRepo.UpdateAsync(appointment);
+        }
+        else
+        {
+            if (appointment.Price > 0)
             {
+                var paid = await _paymentService.ProcessPaymentAsync(userId, appointment.Price);
+                if (!paid)
+                {
+                    return BadRequest("Payment failed");
+                }
                 appointment.Status = Core.Enums.AppointmentStatus.Confirmed;
-                appointment.PaymentStatus = Core.Enums.PaymentStatus.Skipped;
+                appointment.PaymentStatus = Core.Enums.PaymentStatus.Paid;
                 await _appointmentRepo.UpdateAsync(appointment);
             }
-            else
-            {
-                if (appointment.Price > 0)
-                {
-                    var paid = await _paymentService.ProcessPaymentAsync(userId, appointment.Price);
-                    if (!paid)
-                    {
-                        return BadRequest("Payment failed");
-                    }
-                    appointment.Status = Core.Enums.AppointmentStatus.Confirmed;
-                    appointment.PaymentStatus = Core.Enums.PaymentStatus.Paid;
-                    await _appointmentRepo.UpdateAsync(appointment);
-                }
-            }
-            
-            return Ok(new AppointmentDto
-            {
-                Id = appointment.Id,
-                ServiceId = appointment.ServiceId,
-                StartTime = appointment.StartTime,
-                EndTime = appointment.EndTime,
-                Status = appointment.Status.ToString(),
-                Price = appointment.Price
-            });
         }
-        catch (Exception ex)
+        
+        return Ok(new AppointmentDto
         {
-            return BadRequest(ex.Message);
-        }
+            Id = appointment.Id,
+            ServiceId = appointment.ServiceId,
+            StartTime = appointment.StartTime,
+            EndTime = appointment.EndTime,
+            Status = appointment.Status.ToString(),
+            Price = appointment.Price
+        });
     }
 
     [HttpGet]

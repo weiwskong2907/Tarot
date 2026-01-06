@@ -8,6 +8,9 @@ using Tarot.Core.Entities;
 using Tarot.Core.Enums;
 using Tarot.Core.Interfaces;
 
+using Microsoft.Extensions.Options;
+using Tarot.Core.Settings;
+
 namespace Tarot.Tests;
 
 public class AppointmentsControllerTests
@@ -17,6 +20,7 @@ public class AppointmentsControllerTests
     private readonly Mock<IRepository<Appointment>> _mockAppointmentRepo;
     private readonly Mock<IRepository<Service>> _mockServiceRepo;
     private readonly Mock<IRepository<Consultation>> _mockConsultationRepo;
+    private readonly Mock<IOptions<AppSettings>> _mockSettings;
     private readonly AppointmentsController _controller;
     private readonly Guid _userId;
 
@@ -27,7 +31,18 @@ public class AppointmentsControllerTests
         _mockAppointmentRepo = new Mock<IRepository<Appointment>>();
         _mockServiceRepo = new Mock<IRepository<Service>>();
         _mockConsultationRepo = new Mock<IRepository<Consultation>>();
-        _controller = new AppointmentsController(_mockAppointmentService.Object, _mockPaymentService.Object, _mockAppointmentRepo.Object, _mockServiceRepo.Object, _mockConsultationRepo.Object);
+        _mockSettings = new Mock<IOptions<AppSettings>>();
+        
+        // Default settings
+        _mockSettings.Setup(s => s.Value).Returns(new AppSettings { EnablePayment = true });
+
+        _controller = new AppointmentsController(
+            _mockAppointmentService.Object, 
+            _mockPaymentService.Object, 
+            _mockAppointmentRepo.Object, 
+            _mockServiceRepo.Object, 
+            _mockConsultationRepo.Object,
+            _mockSettings.Object);
         
         _userId = Guid.NewGuid();
         

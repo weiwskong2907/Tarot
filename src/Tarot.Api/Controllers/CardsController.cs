@@ -8,13 +8,18 @@ namespace Tarot.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
-public class CardsController(IRepository<Card> cardRepo) : ControllerBase
+public class CardsController(IRepository<Card> cardRepo, IRedisService redis) : ControllerBase
 {
     private readonly IRepository<Card> _cardRepo = cardRepo;
+    private readonly IRedisService _redis = redis;
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? q, [FromQuery] Suit? suit, [FromQuery] ArcanaType? arcana, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
+        var cacheKey = $"cards:{q?.Trim()}:{suit}:{arcana}:{page}:{pageSize}";
+        var cached = await _redis.GetAsync<CardListResponse>(cacheKey);
+        if (cached != null) return Ok(cached);
+
         q = (q ?? "").Trim();
         int skip = Math.Max(0, (page - 1) * pageSize);
         System.Linq.Expressions.Expression<Func<Card, bool>> predicate = c =>
@@ -22,25 +27,29 @@ public class CardsController(IRepository<Card> cardRepo) : ControllerBase
             (!suit.HasValue || c.Suit == suit.Value) &&
             (!arcana.HasValue || c.ArcanaType == arcana.Value);
         var total = await _cardRepo.CountAsync(predicate);
-        var items = await _cardRepo.ListAsync(predicate, skip, pageSize);
-        return Ok(new
+        var items = await _cardRepo.ListReadOnlyAsync(predicate, skip, pageSize);
+        
+        var result = new CardListResponse
         {
-            total,
-            page,
-            pageSize,
-            items = items.Select(c => new
+            Total = total,
+            Page = page,
+            PageSize = pageSize,
+            Items = [.. items.Select(c => new CardResponseDto
             {
-                c.Id,
-                c.Name,
-                c.ImageUrl,
-                c.Suit,
-                c.ArcanaType,
-                c.MeaningUpright,
-                c.MeaningReversed,
-                c.Keywords,
-                c.AdminNotes
-            })
-        });
+                Id = c.Id,
+                Name = c.Name,
+                ImageUrl = c.ImageUrl,
+                Suit = c.Suit,
+                ArcanaType = c.ArcanaType,
+                MeaningUpright = c.MeaningUpright,
+                MeaningReversed = c.MeaningReversed,
+                Keywords = c.Keywords,
+                AdminNotes = c.AdminNotes
+            })]
+        };
+
+        await _redis.SetAsync(cacheKey, result, TimeSpan.FromMinutes(30));
+        return Ok(result);
     }
 
     [HttpGet("{id:guid}")]
@@ -114,3 +123,24 @@ public class CardCreateDto
 }
 
 public class CardUpdateDto : CardCreateDto {}
+
+public class CardListResponse
+{
+    public int Total { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public List<CardResponseDto> Items { get; set; } = [];
+}
+
+public class CardResponseDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
+    public Suit Suit { get; set; }
+    public ArcanaType ArcanaType { get; set; }
+    public string? MeaningUpright { get; set; }
+    public string? MeaningReversed { get; set; }
+    public string? Keywords { get; set; }
+    public string? AdminNotes { get; set; }
+}

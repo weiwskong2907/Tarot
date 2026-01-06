@@ -40,7 +40,7 @@ public class ContactMessagesController(IRepository<ContactMessage> messageRepo, 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var list = await _messageRepo.ListAllAsync();
+        var list = await _messageRepo.ListAllReadOnlyAsync();
         return Ok(list.Select(m => new
         {
             m.Id,

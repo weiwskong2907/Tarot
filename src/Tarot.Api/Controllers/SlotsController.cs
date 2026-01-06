@@ -11,16 +11,22 @@ namespace Tarot.Api.Controllers;
 public class SlotsController(
     IRepository<Appointment> appointmentRepo, 
     IRepository<Service> serviceRepo,
-    IRepository<BlockedSlot> blockedSlotRepo) : ControllerBase
+    IRepository<BlockedSlot> blockedSlotRepo,
+    IRedisService redis) : ControllerBase
 {
     private readonly IRepository<Appointment> _appointmentRepo = appointmentRepo;
     private readonly IRepository<Service> _serviceRepo = serviceRepo;
     private readonly IRepository<BlockedSlot> _blockedSlotRepo = blockedSlotRepo;
+    private readonly IRedisService _redis = redis;
 
     // Simplified slots endpoint: requires serviceId and date (YYYY-MM-DD)
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] DateTime date, [FromQuery] Guid serviceId)
     {
+        var cacheKey = $"slots:{date:yyyyMMdd}:{serviceId}";
+        var cached = await _redis.GetAsync<List<SlotDto>>(cacheKey);
+        if (cached != null) return Ok(cached);
+
         var service = await _serviceRepo.GetByIdAsync(serviceId);
         if (service == null || !service.IsActive) return BadRequest("Invalid service");
 
@@ -28,13 +34,13 @@ public class SlotsController(
         var endOfDay = startOfDay.AddDays(1);
 
         // Fetch existing appointments
-        var appointments = await _appointmentRepo.ListAsync(a => a.StartTime < endOfDay && a.EndTime > startOfDay);
+        var appointments = await _appointmentRepo.ListReadOnlyAsync(a => a.StartTime < endOfDay && a.EndTime > startOfDay);
         var booked = appointments
             .Select(a => (a.StartTime, a.EndTime))
             .ToList();
 
         // Fetch blocked slots
-        var blockedSlots = await _blockedSlotRepo.ListAsync(b => b.StartTime < endOfDay && b.EndTime > startOfDay);
+        var blockedSlots = await _blockedSlotRepo.ListReadOnlyAsync(b => b.StartTime < endOfDay && b.EndTime > startOfDay);
         var blocks = blockedSlots
             .Select(b => (b.StartTime, b.EndTime))
             .ToList();
@@ -43,7 +49,7 @@ public class SlotsController(
         var businessStart = new DateTimeOffset(date.Date.AddHours(9), TimeSpan.Zero);
         var businessEnd = new DateTimeOffset(date.Date.AddHours(18), TimeSpan.Zero);
 
-        var available = new List<DateTimeOffset>();
+        var available = new List<SlotDto>();
         for (var t = businessStart; t.AddMinutes(service.DurationMin) <= businessEnd; t = t.AddMinutes(service.DurationMin))
         {
             var slotEnd = t.AddMinutes(service.DurationMin);
@@ -55,9 +61,16 @@ public class SlotsController(
             var isBlocked = blocks.Any(b => b.StartTime < slotEnd && b.EndTime > t);
 
             if (!hasAppointment && !isBlocked)
-                available.Add(t);
+                available.Add(new SlotDto { Start = t, End = slotEnd });
         }
 
-        return Ok(available.Select(x => new { start = x, end = x.AddMinutes(service.DurationMin) }));
+        await _redis.SetAsync(cacheKey, available, TimeSpan.FromMinutes(5));
+        return Ok(available);
     }
+}
+
+public class SlotDto
+{
+    public DateTimeOffset Start { get; set; }
+    public DateTimeOffset End { get; set; }
 }

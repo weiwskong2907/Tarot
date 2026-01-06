@@ -44,7 +44,7 @@ public class InteractiveControllerTests
             new() { Id = Guid.NewGuid(), Name = "Card 3", MeaningUpright = "Up3", MeaningReversed = "Rev3" },
             new() { Id = Guid.NewGuid(), Name = "Card 4", MeaningUpright = "Up4", MeaningReversed = "Rev4" }
         };
-        _mockCardRepo.Setup(repo => repo.ListAllAsync()).ReturnsAsync(cards);
+        _mockCardRepo.Setup(repo => repo.ListAllReadOnlyAsync()).ReturnsAsync(cards);
 
         // Act
         var result = await _controller.SelfReading();
@@ -95,7 +95,7 @@ public class InteractiveControllerTests
             new() { Name = "Card 1" },
             new() { Name = "Card 2" }
         };
-        _mockCardRepo.Setup(repo => repo.ListAllAsync()).ReturnsAsync(cards);
+        _mockCardRepo.Setup(repo => repo.ListAllReadOnlyAsync()).ReturnsAsync(cards);
 
         // Act
         var result = await _controller.SelfReading();

@@ -1,7 +1,9 @@
 using Tarot.Core.Entities;
 using Tarot.Core.Enums;
+using Tarot.Core.Settings;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.IO;
 
 namespace Tarot.Infrastructure.Data;
@@ -53,16 +55,16 @@ public static class DbInitializer
             services.GetService(typeof(Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>>)) is not Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole<Guid>> roleManager)
             return;
 
-        // If no users exist, create default Super Admin from environment variables
+        var options = services.GetService(typeof(IOptions<AppSettings>)) as IOptions<AppSettings>;
+        var settings = options?.Value?.Admin ?? new AdminSettings();
+
+        // If no users exist, create default Super Admin from settings
         if (!(await userManager.Users.AnyAsync()))
         {
-            var email = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_EMAIL") ?? "admin@example.com";
-            var password = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_PASSWORD") ?? "Passw0rd!";
-            var fullName = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_NAME") ?? "Super Admin";
-            var permissionsEnv = Environment.GetEnvironmentVariable("DEFAULT_ADMIN_PERMISSIONS");
-            var permissions = string.IsNullOrWhiteSpace(permissionsEnv)
-                ? ["DESIGN_EDIT", "KNOWLEDGE_EDIT", "SCHEDULE_MANAGE", "CONSULTATION_REPLY", "FINANCE_VIEW", "BLOG_MANAGE", "TRASH_MANAGE", "INBOX_MANAGE"]
-                : System.Text.Json.JsonSerializer.Deserialize<List<string>>(permissionsEnv) ?? [];
+            var email = settings.DefaultEmail;
+            var password = settings.DefaultPassword;
+            var fullName = settings.DefaultName;
+            var permissions = settings.DefaultPermissions;
 
             var roleName = "SuperAdmin";
             if (!await roleManager.RoleExistsAsync(roleName))

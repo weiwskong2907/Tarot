@@ -9,8 +9,11 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace Tarot.Api.Controllers;
 
+[EnableRateLimiting("strict")]
 [ApiController]
 [Route("api/v1/[controller]")]
 public class AuthController(

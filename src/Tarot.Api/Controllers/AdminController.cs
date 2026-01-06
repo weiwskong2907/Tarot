@@ -10,6 +10,10 @@ using Tarot.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 
+using Microsoft.Extensions.Options;
+using Tarot.Core.Settings;
+using Tarot.Api.Dtos;
+
 namespace Tarot.Api.Controllers;
 
 [Authorize]
@@ -23,7 +27,8 @@ public partial class AdminController(
     IEmailService emailService,
     ILoyaltyService loyaltyService,
     UserManager<AppUser> userManager,
-    AppDbContext dbContext
+    AppDbContext dbContext,
+    IOptions<AppSettings> settings
 ) : ControllerBase
 {
     private readonly IRepository<Appointment> _apptRepo = apptRepo;
@@ -34,6 +39,7 @@ public partial class AdminController(
     private readonly ILoyaltyService _loyaltyService = loyaltyService;
     private readonly UserManager<AppUser> _userManager = userManager;
     private readonly AppDbContext _dbContext = dbContext;
+    private readonly AppSettings _settings = settings.Value;
 
     [Authorize(Policy = "SCHEDULE_MANAGE")]
     [HttpPost("appointments/{id}/cancel")]
@@ -56,7 +62,7 @@ public partial class AdminController(
                     ActorId = adminId,
                     Action = "AppointmentCancel",
                     Details = JsonSerializer.Serialize(new { AppointmentId = appt.Id, Reason = appt.CancellationReason, AffectedUserId = appt.UserId }),
-                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                    IpAddress = MaskIp(HttpContext.Connection.RemoteIpAddress?.ToString())
                 };
                 _dbContext.AuditLogs.Add(log);
                 await _dbContext.SaveChangesAsync();
@@ -79,7 +85,7 @@ public partial class AdminController(
                 ActorId = adminId,
                 Action = "AppointmentCancel",
                 Details = JsonSerializer.Serialize(new { AppointmentId = appt.Id, Reason = appt.CancellationReason, AffectedUserId = appt.UserId }),
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                IpAddress = MaskIp(HttpContext.Connection.RemoteIpAddress?.ToString())
             };
             _dbContext.AuditLogs.Add(log);
             await _dbContext.SaveChangesAsync();
@@ -88,8 +94,7 @@ public partial class AdminController(
         var user = await _userRepo.GetByIdAsync(appt.UserId);
         if (user != null)
         {
-            var useOutbox = (Environment.GetEnvironmentVariable("USE_OUTBOX") ?? "false").Equals("true", StringComparison.OrdinalIgnoreCase);
-            if (useOutbox)
+            if (_settings.UseOutbox)
             {
                 var msg = new OutboxMessage
                 {
@@ -154,7 +159,7 @@ public partial class AdminController(
                     ActorId = adminId,
                     Action = "ConsultationReply",
                     Details = JsonSerializer.Serialize(new { AppointmentId = appt.Id, AffectedUserId = appt.UserId }),
-                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                    IpAddress = MaskIp(HttpContext.Connection.RemoteIpAddress?.ToString())
                 };
                 _dbContext.AuditLogs.Add(log);
                 await _dbContext.SaveChangesAsync();
@@ -184,7 +189,7 @@ public partial class AdminController(
                 ActorId = adminId,
                 Action = "ConsultationReply",
                 Details = JsonSerializer.Serialize(new { AppointmentId = appt.Id, AffectedUserId = appt.UserId }),
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                IpAddress = MaskIp(HttpContext.Connection.RemoteIpAddress?.ToString())
             };
             _dbContext.AuditLogs.Add(log);
             await _dbContext.SaveChangesAsync();
@@ -192,8 +197,7 @@ public partial class AdminController(
 
         if (appt.User != null && !string.IsNullOrEmpty(appt.User.Email))
         {
-            var useOutbox = (Environment.GetEnvironmentVariable("USE_OUTBOX") ?? "false").Equals("true", StringComparison.OrdinalIgnoreCase);
-            if (useOutbox)
+            if (_settings.UseOutbox)
             {
                 var payload = new
                 {
@@ -283,7 +287,7 @@ public partial class AdminController(
                 ActorId = adminId,
                 Action = "BlockSlot",
                 Details = JsonSerializer.Serialize(new { Start = request.StartTime, End = request.EndTime, request.Reason }),
-                IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                IpAddress = MaskIp(HttpContext.Connection.RemoteIpAddress?.ToString())
             };
             _dbContext.AuditLogs.Add(log);
             await _dbContext.SaveChangesAsync();
@@ -383,6 +387,19 @@ public partial class AdminController(
             }
         }
         return Ok(new { processed = list.Count, sent, failed });
+    }
+
+    private static string? MaskIp(string? ip)
+    {
+        if (string.IsNullOrEmpty(ip)) return ip;
+        // Simple masking
+        var parts = ip.Split('.');
+        if (parts.Length == 4)
+        {
+            return $"{parts[0]}.{parts[1]}.*.*";
+        }
+        if (ip.Contains(':')) return "IPv6_MASKED";
+        return "***";
     }
 
     private static string? MaskDetails(string? details)
@@ -664,10 +681,3 @@ public partial class AdminController(
         return BadRequest("Unknown entity");
     }
 }
-
-public class CancelRequest { public string? Reason { get; set; } }
-public class ReplyRequest { public string Message { get; set; } = string.Empty; }
-public class BlockSlotRequest { public DateTimeOffset StartTime { get; set; } public DateTimeOffset EndTime { get; set; } public string? Reason { get; set; } }
-public class CreateStaffRequest { public string Email { get; set; } = string.Empty; public string FullName { get; set; } = string.Empty; public string Password { get; set; } = string.Empty; public List<string>? Permissions { get; set; } }
-public class UpdatePermissionsRequest { public List<string>? Permissions { get; set; } }
-public class RestoreRequest { public string Entity { get; set; } = string.Empty; public Guid Id { get; set; } }

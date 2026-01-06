@@ -15,7 +15,7 @@ public class SiteSettingsController(IRepository<SiteSetting> settingsRepo) : Con
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var list = await _settingsRepo.ListAllAsync();
+        var list = await _settingsRepo.ListAllReadOnlyAsync();
         return Ok(list.Select(s => new
         {
             s.Id,

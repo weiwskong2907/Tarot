@@ -17,14 +17,29 @@ public class EfRepository<T>(AppDbContext dbContext) : IRepository<T> where T : 
         return await _dbContext.Set<T>().ToListAsync();
     }
 
+    public async Task<IReadOnlyList<T>> ListAllReadOnlyAsync()
+    {
+        return await _dbContext.Set<T>().AsNoTracking().ToListAsync();
+    }
+
     public async Task<IReadOnlyList<T>> ListAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate)
     {
         return await _dbContext.Set<T>().Where(predicate).ToListAsync();
     }
 
+    public async Task<IReadOnlyList<T>> ListReadOnlyAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate)
+    {
+        return await _dbContext.Set<T>().AsNoTracking().Where(predicate).ToListAsync();
+    }
+
     public async Task<IReadOnlyList<T>> ListAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate, int skip, int take)
     {
         return await _dbContext.Set<T>().Where(predicate).Skip(skip).Take(take).ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<T>> ListReadOnlyAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate, int skip, int take)
+    {
+        return await _dbContext.Set<T>().AsNoTracking().Where(predicate).Skip(skip).Take(take).ToListAsync();
     }
 
     public async Task<T?> FirstOrDefaultAsync(System.Linq.Expressions.Expression<Func<T, bool>> predicate)

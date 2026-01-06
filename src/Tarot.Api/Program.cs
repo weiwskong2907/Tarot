@@ -13,13 +13,54 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Tarot.Api.Validators;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateAppointmentDtoValidator>();
+
+builder.Services.AddExceptionHandler<Tarot.Api.Infrastructure.GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+
+// Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    
+    // Strict Policy for Auth and Interactive (10 req/min per IP)
+    options.AddPolicy("strict", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // General Policy for other APIs (100 req/min per IP)
+    options.AddPolicy("general", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 5
+            }));
+});
 
 // Health Checks
 var healthChecks = builder.Services.AddHealthChecks();
@@ -41,8 +82,13 @@ try
     builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
     builder.Services.AddScoped<IRedisService, RedisService>();
 }
-catch
+catch (Exception ex)
 {
+    if (builder.Environment.IsProduction())
+    {
+        throw new InvalidOperationException("Redis connection failed in Production environment. Please verify connection string and Redis status.", ex);
+    }
+
     // Fallback to In-Memory if Redis is not available (for dev/testing)
     Console.WriteLine("Redis not available, using In-Memory fallback.");
     builder.Services.AddSingleton<IRedisService, InMemoryRedisService>();
@@ -112,6 +158,7 @@ builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<IBlogService, BlogService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<Tarot.Core.Interfaces.IFileStorageService, Tarot.Infrastructure.Services.LocalFileStorageService>();
 // Mock Payment Service (as requested by user in previous turn)
 builder.Services.AddScoped<IPaymentService, MockPaymentService>();
 // Hosted Outbox Processor (gated by env/config)
@@ -139,6 +186,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+app.UseExceptionHandler();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

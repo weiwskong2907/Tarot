@@ -1,25 +1,30 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Tarot.Core.Interfaces;
+using Tarot.Core.Settings;
 
 namespace Tarot.Infrastructure.Services;
 
 public class MockPaymentService : IPaymentService
 {
     private readonly ILogger<MockPaymentService> _logger;
-    private readonly IConfiguration _config;
+    private readonly AppSettings _settings;
 
-    public MockPaymentService(ILogger<MockPaymentService> logger, IConfiguration config)
+    public MockPaymentService(ILogger<MockPaymentService> logger, IOptions<AppSettings> settings)
     {
         _logger = logger;
-        _config = config;
+        _settings = settings.Value;
     }
 
     public Task<bool> ProcessPaymentAsync(Guid userId, decimal amount, string currency = "USD")
     {
         _logger.LogInformation("Processing mock payment for User {UserId}: {Amount} {Currency}", userId, amount, currency);
-        var failFlag = _config["Payments:MockFail"] ?? Environment.GetEnvironmentVariable("MOCK_PAYMENT_FAIL");
-        if (bool.TryParse(failFlag, out var fail) && fail)
+        
+        // Allow environment variable override for testing
+        var envFail = Environment.GetEnvironmentVariable("MOCK_PAYMENT_FAIL");
+        var shouldFail = (envFail != null && bool.TryParse(envFail, out var f) && f) || _settings.Payment.MockFail;
+
+        if (shouldFail)
         {
             _logger.LogWarning("Mock payment failure simulated for User {UserId}", userId);
             return Task.FromResult(false);
